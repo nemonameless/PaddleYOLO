@@ -542,21 +542,21 @@ class Trainer(object):
                     outputs = model(data)
                     loss = outputs['loss']
                     scaler.scale(loss).backward()
-                    if ni <= nw:
+                    if 1: #ni <= nw:
                         scaler.step(self.optimizer_b)
                         scaler.step(self.optimizer_bn)
                         scaler.step(self.optimizer_w)
                     else:
                         scaler.step(self.optimizer)
                     scaler.update()
-                    if ni <= nw:
+                    if 1: #ni <= nw:
                         self.optimizer_b.clear_grad()
                         self.optimizer_bn.clear_grad()
                         self.optimizer_w.clear_grad()
                     else:
                         self.optimizer.clear_grad()
 
-                if ni <= nw:
+                if 1: #ni <= nw:
                     curr_lr = self.optimizer_w.get_lr()
                     # self.optimizer.set_lr(curr_lr)
                     self.lr_b.step()
