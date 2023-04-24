@@ -13,5 +13,6 @@ snapshot_epoch: 10
 weights: output/yolov8_s_500e_coco/model_final
 
 
+worker_num: 4
 TrainReader:
   batch_size: 16 # default 8 gpus, total bs = 128

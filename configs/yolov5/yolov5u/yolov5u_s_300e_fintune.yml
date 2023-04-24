@@ -1,0 +1,40 @@
+_BASE_: [
+  '../../datasets/coco_detection.yml', #
+  '../../runtime.yml',
+  './_base_/optimizer_300e.yml',
+  '../_base_/yolov5u_cspdarknet.yml',
+  './_base_/yolov5u_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.50
+
+log_iter: 100
+snapshot_epoch: 10
+weights: output/yolov5u_s_300e_coco/model_final
+
+pretrain_weights: https://paddledet.bj.bcebos.com/models/yolov5u_s_300e_coco.pdparams
+
+
+worker_num: 4
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128
+
+
+epoch: 300
+LearningRate:
+  base_lr: 0.001 #0.01
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 300
+    min_lr_ratio: 0.01
+  - !ExpWarmup
+    epochs: 3
+
+OptimizerBuilder:
+  optimizer:
+    type: Momentum
+    momentum: 0.937
+    use_nesterov: True
+  regularizer:
+    factor: 0.001 # 0.0005 in yolov8
+    type: L2

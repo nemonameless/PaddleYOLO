@@ -69,8 +69,7 @@ class Trainer(object):
         self.custom_white_list = self.cfg.get('custom_white_list', None)
         self.custom_black_list = self.cfg.get('custom_black_list', None)
 
-        if self.cfg.architecture in ['RTMDet', 'YOLOv6', 'YOLOv8'
-                                     ] and self.mode == 'train':
+        if self.cfg.architecture in ['RTMDet', 'YOLOv6'] and self.mode == 'train':
             raise NotImplementedError('{} training not supported yet.'.format(
                 self.cfg.architecture))
 

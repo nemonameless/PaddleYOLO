@@ -15,6 +15,5 @@ OptimizerBuilder:
     momentum: 0.937
     use_nesterov: True
   regularizer:
-    factor: 0.0005
+    factor: 0.001 # 0.0005 in yolov8
     type: L2
-  clip_grad_by_value: 10.

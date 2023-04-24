@@ -8,10 +8,22 @@ TrainDataset:
     dataset_dir: dataset/coco
     data_fields: ['image', 'gt_bbox', 'gt_class', 'is_crowd']
 
+TrainDataset2:
+  !COCODataSet
+    image_dir: val2017
+    anno_path: annotations/instances_val2017.json
+    #anno_path: annotations/instances_val2017_rand24.json
+    #anno_path: annotations/instances_val2017_8img.json
+    dataset_dir: dataset/coco
+    data_fields: ['image', 'gt_bbox', 'gt_class', 'is_crowd']
+
 EvalDataset:
   !COCODataSet
     image_dir: val2017
     anno_path: annotations/instances_val2017.json
+    #anno_path: annotations/instances_val2017_rand24.json
+    #anno_path: annotations/instances_val2017_2img.json
+    #anno_path: annotations/instances_val2017_8img.json
     dataset_dir: dataset/coco
     allow_empty: true
 

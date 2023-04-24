@@ -1,17 +1,18 @@
 _BASE_: [
   '../../datasets/coco_detection.yml',
   '../../runtime.yml',
-  '../_base_/optimizer_300e.yml',
+  './_base_/optimizer_300e.yml',
   '../_base_/yolov5u_cspdarknet.yml',
-  '../_base_/yolov5_reader.yml',
+  './_base_/yolov5u_reader.yml',
 ]
 depth_mult: 0.33
 width_mult: 0.25
 
-log_iter: 100
-snapshot_epoch: 10
+log_iter: 50
+snapshot_epoch: 1
 weights: output/yolov5u_n_300e_coco/model_final
 
 
+worker_num: 4
 TrainReader:
   batch_size: 16 # default 8 gpus, total bs = 128

@@ -6,7 +6,8 @@ mosaic_epoch: &mosaic_epoch 490 # last 10 epochs close mosaic, totally 500 epoch
 worker_num: 4
 TrainReader:
   sample_transforms:
-    - Decode: {}
+    #- Decode: {}
+    - DecodeCache: {cache_root: 'dataset/coco/cache/buffer'}
     - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size}
     - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
     - RandomFlip: {}
@@ -29,7 +30,7 @@ EvalReader:
     - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 1
+  batch_size: 8
 
 
 TestReader:

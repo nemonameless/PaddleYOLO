@@ -1,0 +1,47 @@
+_BASE_: [
+  '../../datasets/voc.yml',
+  '../../runtime.yml',
+  './_base_/optimizer_300e_high.yml',
+  '../_base_/yolov5u_cspdarknet.yml',
+  './_base_/yolov5u_reader_high_aug.yml',
+]
+depth_mult: 1.0
+width_mult: 1.0
+
+log_iter: 50
+snapshot_epoch: 5
+weights: output/yolov5u_l_60e_voc/model_final
+
+pretrain_weights: https://paddledet.bj.bcebos.com/models/yolov5u_l_300e_coco.pdparams
+
+
+worker_num: 4
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128
+
+
+epoch: 60
+LearningRate:
+  base_lr: 0.001 # 0.01
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 60
+    min_lr_ratio: 0.01
+  - !ExpWarmup
+    epochs: 1
+
+OptimizerBuilder:
+  optimizer:
+    type: Momentum
+    momentum: 0.937
+    use_nesterov: True
+  regularizer:
+    factor: 0.001 # 0.0005 in yolov8
+    type: L2
+
+# metric: COCO
+# EvalDataset:
+#   !COCODataSet
+#     image_dir: VOCdevkit/VOC2007/JPEGImages
+#     anno_path: voc_test.json
+#     dataset_dir: dataset/voc

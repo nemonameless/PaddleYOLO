@@ -18,5 +18,6 @@ YOLOv8CSPDarkNet:
   last2_stage_ch: 512 # The actual channel is int(512 * width_mult), not int(768 * width_mult) as in YOLOv5-P6
 
 
+worker_num: 4
 TrainReader:
   batch_size: 16 # default 8 gpus, total bs = 128
