@@ -60,7 +60,7 @@ class YOLOv8Head(nn.Layer):
                  trt=False,
                  exclude_nms=False,
                  exclude_post_process=False,
-                 print_l1_loss=True):
+                 print_l1_loss=False):
         super(YOLOv8Head, self).__init__()
         assert len(in_channels) > 0, "len(in_channels) should > 0"
         self.in_channels = in_channels
@@ -122,9 +122,6 @@ class YOLOv8Head(nn.Layer):
 
     def _init_bias(self):
         for a, b, s in zip(self.conv_reg, self.conv_cls, self.fpn_strides):
-            # a[-1].bias.set_value(a[-1].bias + 1.0)
-            # conv_cls_bias = math.log(5 / self.num_classes / (640 / s)**2)
-            # b[-1].bias.set_value(b[-1].bias + conv_cls_bias)
             constant_(a[-1].weight)
             constant_(a[-1].bias, 1.0)
             constant_(b[-1].weight)
@@ -230,32 +227,9 @@ class YOLOv8Head(nn.Layer):
             reduction='none') * weight_right
         return (loss_left + loss_right).mean(-1, keepdim=True)
 
-    # def _dfl_loss(self, pred_dist, target, reduction='mean', weight=None, avg_factor=None):
-    #     target_left = paddle.cast(target.floor(), 'int64')
-    #     target_right = target_left + 1
-    #     weight_left = target_right.astype('float32') - target
-    #     #weight_right = 1 - weight_left
-    #     weight_right = target - target_left.astype('float32') ###
-    #     loss_left = F.cross_entropy(
-    #         pred_dist, target_left,
-    #         reduction='none') * weight_left
-    #     loss_right = F.cross_entropy(
-    #         pred_dist, target_right,
-    #         reduction='none') * weight_right
-    #     loss = (loss_left + loss_right).mean(-1, keepdim=True)
-    #     if weight is not None:
-    #         loss = loss * weight
-    #     loss = loss.sum()
-    #     if avg_factor is not None:
-    #         loss /= avg_factor
-    #     # 11.437333333333333
-    #     return loss # (loss_left + loss_right).mean(-1, keepdim=True)
-
     def get_loss(self, head_outs, gt_meta):
         cls_scores, bbox_preds, bbox_dist_preds, anchors,\
         anchor_points, num_anchors_list, stride_tensor = head_outs
-
-
 
 
         bs = cls_scores[0].shape[0]
@@ -279,25 +253,14 @@ class YOLOv8Head(nn.Layer):
         pred_distri = paddle.concat(flatten_pred_bboxes, 1) # [8, 8400, 4]
 
 
-
-
-
-        #pred_distri = paddle.to_tensor(np.load('flatten_dist_preds.npy'))
-        #pred_scores = paddle.to_tensor(np.load('flatten_cls_preds.npy'))
-
         anchor_points_s = anchor_points / stride_tensor
         pred_bboxes = self._bbox_decode(anchor_points_s, pred_distri) # 9345410.  [8, 8400, 4]
         pred_bboxes = pred_bboxes * stride_tensor # must *stride
-        #pred_bboxes = paddle.to_tensor(np.load('flatten_pred_bboxes_d.npy')) # 85927984.
 
         gt_labels = gt_meta['gt_class'] # [16, 51, 1]
         gt_bboxes = gt_meta['gt_bbox'] # xyxy max=640 # [16, 51, 4]
         pad_gt_mask = gt_meta['pad_gt_mask']
         # pad_gt_mask = paddle.cast((gt_bboxes.sum(-1, keepdim=True) > 0), 'float32')
-
-        # gt_labels = paddle.to_tensor(np.load('gt_labels.npy'), 'int32')
-        # gt_bboxes = paddle.to_tensor(np.load('gt_bboxes.npy'), 'float32')
-        # pad_gt_mask = paddle.to_tensor(np.load('pad_bbox_flag.npy'), 'int32')
 
         # label assignment
         #          [8, 8400, 4]  80842408.  8781976.      assigned_scores 131.79727173
@@ -318,8 +281,8 @@ class YOLOv8Head(nn.Layer):
         pred_bboxes /= stride_tensor ###
 
         # cls loss
-        # loss_cls = self.bce(pred_scores, assigned_scores).sum() # [16, 8400, 80]
-        loss_cls = F.binary_cross_entropy_with_logits(pred_scores, assigned_scores, reduction='none').sum() # [16, 8400, 80]
+        loss_cls = self.bce(pred_scores, assigned_scores).sum() # [16, 8400, 80]
+        #loss_cls = F.binary_cross_entropy_with_logits(pred_scores, assigned_scores, reduction='none').sum() # [16, 8400, 80]
 
         assigned_scores_sum = assigned_scores.sum()
         if paddle.distributed.get_world_size() > 1:
@@ -372,17 +335,6 @@ class YOLOv8Head(nn.Layer):
             loss_dfl = self._df_loss(pred_dist_pos,
                                      assigned_ltrb_pos) * bbox_weight
             loss_dfl = loss_dfl.sum() / assigned_scores_sum
-
-            # pred_dist_pos = paddle.to_tensor(np.load('/paddle/yolo/nf/mmyolo/pred_dist_pos.npy'))
-            # pred_dist_pos = pred_dist_pos.reshape([-1, 4, 16])
-            # assigned_ltrb_pos = paddle.to_tensor(np.load('/paddle/yolo/nf/mmyolo/assigned_ltrb_pos.npy'))
-            # bbox_weight = paddle.to_tensor(np.load('/paddle/yolo/nf/mmyolo/bbox_weight.npy'))
-            # loss_dfl = self._dfl_loss(
-            #     pred_dist_pos.reshape([-1, 16]),
-            #     assigned_ltrb_pos.reshape([-1]),
-            #     weight=bbox_weight.expand([-1, 4]).reshape([-1]),
-            #     avg_factor=assigned_scores_sum)
-            # # loss_dfl = loss_dfl.sum() / assigned_scores_sum
         else:
             loss_iou = flatten_dist_preds.sum() * 0.
             loss_dfl = flatten_dist_preds.sum() * 0.

@@ -1,9 +1,9 @@
 _BASE_: [
   '../../datasets/coco_detection.yml',
   '../../runtime.yml',
-  '../_base_/optimizer_300e.yml',
+  './_base_/optimizer_300e.yml',
   '../_base_/yolov7u_elannet.yml', # yolov7u
-  '../_base_/yolov7_reader.yml',
+  './_base_/yolov7u_reader.yml',
 ]
 log_iter: 100
 snapshot_epoch: 10
@@ -15,5 +15,6 @@ ELANFPN:
   for_u6: True
 
 
+worker_num: 4
 TrainReader:
-  batch_size: 32
+  batch_size: 32 # default 8 gpus, total bs = 256
