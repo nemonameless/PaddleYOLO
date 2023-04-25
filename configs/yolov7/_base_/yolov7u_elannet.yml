@@ -4,7 +4,7 @@ use_ema: True
 ema_decay: 0.9999
 ema_decay_type: "exponential"
 act: silu
-# find_unused_parameters: True
+find_unused_parameters: True
 
 depth_mult: 1.0 # no use in YOLOv7
 width_mult: 1.0
