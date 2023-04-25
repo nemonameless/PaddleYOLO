@@ -14,12 +14,6 @@ weights: output/yolov5u_s_60e_voc/model_final
 
 pretrain_weights: https://paddledet.bj.bcebos.com/models/yolov5u_s_300e_coco.pdparams
 
-
-worker_num: 4
-TrainReader:
-  batch_size: 16 # default 8 gpus, total bs = 128
-
-
 epoch: 60
 LearningRate:
   base_lr: 0.001 # 0.01
@@ -28,7 +22,7 @@ LearningRate:
     max_epochs: 60
     min_lr_ratio: 0.01
   - !ExpWarmup
-    epochs: 1
+    epochs: 3
 
 OptimizerBuilder:
   optimizer:
@@ -45,3 +39,27 @@ OptimizerBuilder:
 #     image_dir: VOCdevkit/VOC2007/JPEGImages
 #     anno_path: voc_test.json
 #     dataset_dir: dataset/voc
+
+
+input_height: &input_height 640
+input_width: &input_width 640
+input_size: &input_size [*input_height, *input_width]
+mosaic_epoch: &mosaic_epoch 50
+worker_num: 4
+
+TrainReader:
+  sample_transforms:
+    - Decode: {}
+    - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size}
+    - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
+    - RandomFlip: {}
+  batch_transforms:
+    - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+    - Permute: {}
+    - PadGT: {}
+  batch_size: 16 # default 8 gpus, total bs = 128
+  shuffle: True
+  drop_last: False
+  use_shared_memory: True
+  collate_batch: True
+  mosaic_epoch: *mosaic_epoch

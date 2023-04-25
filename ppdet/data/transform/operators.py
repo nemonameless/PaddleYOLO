@@ -373,6 +373,8 @@ class MosaicPerspective(BaseOperator):
     def __call__(self, sample, context=None):
         # current sample and other 3 samples to a new sample
         if not isinstance(sample, Sequence):
+            sample['image'], sample['gt_bbox'] = self.letterbox_resize(
+                sample['image'], sample['gt_bbox'], self.target_size)
             return sample
         # assert len(sample) == 5 or len(
         #     sample) == 10, 'YOLOv5 Mosaic need 4 or 9 samples and 1 for mixup'

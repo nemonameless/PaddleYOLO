@@ -1,7 +1,7 @@
 input_height: &input_height 640
 input_width: &input_width 640
 input_size: &input_size [*input_height, *input_width]
-mosaic_epoch: &mosaic_epoch 300
+mosaic_epoch: &mosaic_epoch 290
 
 worker_num: 4
 TrainReader:

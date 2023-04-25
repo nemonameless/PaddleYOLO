@@ -1,9 +1,9 @@
 export FLAGS_allocator_strategy=auto_growth
 model_type=yolov5u
-job_name=yolov5u_s_300e_coco
-job_name=yolov5u_n_300e_coco
-# job_name=yolov5u_s_60e_voc
-# job_name=yolov5u_l_60e_voc
+# job_name=yolov5u_s_300e_coco
+# job_name=yolov5u_n_300e_coco
+job_name=yolov5u_s_60e_voc
+#job_name=yolov5u_l_60e_voc
 
 config=configs/yolov5/${model_type}/${job_name}.yml
 log_dir=log_dir/${job_name}
