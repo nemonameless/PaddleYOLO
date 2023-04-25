@@ -15,3 +15,24 @@ weights: output/yolov5_n_300e_coco/model_final
 
 TrainReader:
   batch_size: 16 # default 8 gpus, total bs = 128
+
+
+epoch: 300
+LearningRate:
+  base_lr: 0.01
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 300
+    min_lr_ratio: 0.01
+  - !ExpWarmup
+    epochs: 3
+
+OptimizerBuilder:
+  optimizer:
+    type: Momentum
+    momentum: 0.937
+    use_nesterov: True
+  regularizer:
+    factor: 0.001 # 0.0005 in yolov8
+    type: L2
+  clip_grad_by_value: 10.
