@@ -1,12 +1,11 @@
 export FLAGS_allocator_strategy=auto_growth
-model_type=yolov5u
-#job_name=yolov5u_s_300e_coco
-job_name=yolov5u_s_60e_voc
-#job_name=yolov5u_s_300e_finetune
+model_type=yolov7u
+job_name=yolov7u_l_300e_coco
 
-config=configs/yolov5/${model_type}/${job_name}.yml
+config=configs/yolov7/${model_type}/${job_name}.yml
 log_dir=log_dir/${job_name}
 weights=https://paddledet.bj.bcebos.com/models/${job_name}.pdparams
+weights=./${job_name}.pdparams
 
 # 1. training
 #CUDA_VISIBLE_DEVICES=2 python3.7 tools/train.py -c ${config} --eval #-r ${weights} --eval

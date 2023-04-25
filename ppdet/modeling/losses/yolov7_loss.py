@@ -245,16 +245,16 @@ class YOLOv7Loss(nn.Layer):
                 obji_aux = self.BCEobj(pi_aux[:, :, :, :, 4], tobj_aux)
                 lobj += 0.25 * obji_aux * self.balance[i]  # obj_aux loss
 
-        yolo_losses = dict()
-        yolo_losses['loss_box'] = lbox * self.loss_weights['box']
-        yolo_losses['loss_cls'] = lcls * self.loss_weights['cls']
-        yolo_losses['loss_obj'] = lobj * self.loss_weights['obj']
-        loss_all = yolo_losses['loss_box'] + yolo_losses[
-            'loss_obj'] + yolo_losses['loss_cls']
         batch_size = head_outs[0].shape[0]
         num_gpus = gt_targets.get('num_gpus', 8)
-        yolo_losses['loss'] = loss_all * batch_size * num_gpus
-        return yolo_losses
+        total_bs = batch_size * num_gpus
+        yolo_losses = dict()
+        yolo_losses['loss_box'] = lbox * self.loss_weights['box'] * total_bs
+        yolo_losses['loss_cls'] = lcls * self.loss_weights['cls'] * total_bs
+        yolo_losses['loss_obj'] = lobj * self.loss_weights['obj'] * total_bs
+        loss_all = yolo_losses['loss_box'] + yolo_losses[
+            'loss_obj'] + yolo_losses['loss_cls']
+        return loss_all
 
     def build_targets(self, p, targets, anchors, batch_images):
         indices, anch = self.find_3_positive(p, targets, anchors)

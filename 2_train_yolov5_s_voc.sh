@@ -2,7 +2,7 @@ export FLAGS_allocator_strategy=auto_growth
 model_type=voc
 job_name=yolov5_s_60e_voc
 
-config=configs/yolov5/${model_type}/${job_name}.yml
+config=configs/${model_type}/${job_name}.yml
 log_dir=log_dir/${job_name}
 weights=https://paddledet.bj.bcebos.com/models/${job_name}.pdparams
 

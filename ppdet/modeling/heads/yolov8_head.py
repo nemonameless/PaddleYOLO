@@ -60,7 +60,7 @@ class YOLOv8Head(nn.Layer):
                  trt=False,
                  exclude_nms=False,
                  exclude_post_process=False,
-                 print_l1_loss=False):
+                 print_l1_loss=True):
         super(YOLOv8Head, self).__init__()
         assert len(in_channels) > 0, "len(in_channels) should > 0"
         self.in_channels = in_channels
@@ -281,8 +281,8 @@ class YOLOv8Head(nn.Layer):
         pred_bboxes /= stride_tensor ###
 
         # cls loss
-        loss_cls = self.bce(pred_scores, assigned_scores).sum() # [16, 8400, 80]
-        #loss_cls = F.binary_cross_entropy_with_logits(pred_scores, assigned_scores, reduction='none').sum() # [16, 8400, 80]
+        #loss_cls = self.bce(pred_scores, assigned_scores).sum() # [16, 8400, 80]
+        loss_cls = F.binary_cross_entropy_with_logits(pred_scores, assigned_scores, reduction='none').sum() # [16, 8400, 80]
 
         assigned_scores_sum = assigned_scores.sum()
         if paddle.distributed.get_world_size() > 1:
@@ -317,7 +317,7 @@ class YOLOv8Head(nn.Layer):
             if self.print_l1_loss:
                 loss_l1 = F.l1_loss(pred_bboxes_pos, assigned_bboxes_pos)
             else:
-                loss_l1 = paddle.zeros([1])
+                loss_l1 = flatten_dist_preds.sum() * 0.
 
             # dfl loss
             dist_mask = mask_positive.unsqueeze(-1).tile(
@@ -356,7 +356,7 @@ class YOLOv8Head(nn.Layer):
         }
         if self.print_l1_loss:
             # just see convergence
-            out_dict.update({'loss_l1': loss_l1})
+            out_dict.update({'loss_l1': loss_l1 * total_bs})
         return out_dict
 
     def post_process(self, head_outs, im_shape, scale_factor):

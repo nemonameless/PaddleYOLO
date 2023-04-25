@@ -18,6 +18,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import ParamAttr
 from paddle.regularizer import L2Decay
+from ..initializer import constant_
 from ppdet.core.workspace import register
 from ppdet.modeling.backbones.yolov7_elannet import ImplicitA, ImplicitM
 from ppdet.modeling.layers import MultiClassNMS
@@ -278,7 +279,7 @@ class YOLOv7uHead(nn.Layer):
     # YOLOv7 Anchor-Free Head, like YOLOv8Head + use_implicit
     __shared__ = [
         'num_classes', 'eval_size', 'use_implicit', 'trt', 'exclude_nms',
-        'exclude_post_process', 'use_shared_conv'
+        'exclude_post_process'
     ]
     __inject__ = ['assigner', 'nms']
 
@@ -290,21 +291,18 @@ class YOLOv7uHead(nn.Layer):
                  grid_cell_scale=5.0,
                  grid_cell_offset=0.5,
                  reg_max=16,
-                 reg_range=None,
-                 use_varifocal_loss=False,
                  assigner='TaskAlignedAssigner',
                  nms='MultiClassNMS',
                  eval_size=None,
-                 use_implicit=False,
                  loss_weight={
-                     'class': 1.0,
-                     'iou': 2.5,
-                     'dfl': 0.5,
+                     'class': 0.5,
+                     'iou': 7.5,
+                     'dfl': 1.5,
                  },
                  trt=False,
+                 use_implicit=True,
                  exclude_nms=False,
                  exclude_post_process=False,
-                 use_shared_conv=True,
                  print_l1_loss=True):
         super(YOLOv7uHead, self).__init__()
         assert len(in_channels) > 0, "len(in_channels) should > 0"
@@ -313,12 +311,7 @@ class YOLOv7uHead(nn.Layer):
         self.fpn_strides = fpn_strides
         self.grid_cell_scale = grid_cell_scale
         self.grid_cell_offset = grid_cell_offset
-        if reg_range:
-            self.reg_range = reg_range
-        else:
-            self.reg_range = (0, reg_max)  # not reg_max+1
-        self.reg_channels = self.reg_range[1] - self.reg_range[0]
-        self.use_varifocal_loss = use_varifocal_loss
+        self.reg_max = reg_max
         self.assigner = assigner
         self.nms = nms
         if isinstance(self.nms, MultiClassNMS) and trt:
@@ -328,15 +321,14 @@ class YOLOv7uHead(nn.Layer):
         self.exclude_nms = exclude_nms
         self.exclude_post_process = exclude_post_process
         self.print_l1_loss = print_l1_loss
-        self.use_shared_conv = use_shared_conv
+
         self.use_implicit = use_implicit
 
         # cls loss
-        self.bce = nn.BCEWithLogitsLoss(
-            pos_weight=paddle.to_tensor([1.0]), reduction="mean")
+        self.bce = nn.BCEWithLogitsLoss(reduction='none')
 
         # pred head
-        c2 = max((16, in_channels[0] // 4, self.reg_channels * 4))
+        c2 = max((16, in_channels[0] // 4, self.reg_max * 4))
         c3 = max(in_channels[0], self.num_classes)
         self.conv_reg = nn.LayerList()
         self.conv_cls = nn.LayerList()
@@ -349,7 +341,7 @@ class YOLOv7uHead(nn.Layer):
                         c2, c2, 3, 1, act=act),
                     nn.Conv2D(
                         c2,
-                        self.reg_channels * 4,
+                        self.reg_max * 4,
                         1,
                         bias_attr=ParamAttr(regularizer=L2Decay(0.0))),
                 ]))
@@ -365,6 +357,9 @@ class YOLOv7uHead(nn.Layer):
                         1,
                         bias_attr=ParamAttr(regularizer=L2Decay(0.0))),
                 ]))
+        # projection
+        self.proj = paddle.arange(self.reg_max).astype('float32')
+        self._init_bias()
 
         if self.use_implicit:
             self.ia2 = nn.LayerList()
@@ -374,18 +369,8 @@ class YOLOv7uHead(nn.Layer):
             for in_c in self.in_channels:
                 self.ia2.append(ImplicitA(in_c))
                 self.ia3.append(ImplicitA(in_c))
-                self.im2.append(ImplicitM(self.reg_channels * 4))
+                self.im2.append(ImplicitM(self.reg_max * 4))
                 self.im3.append(ImplicitM(self.num_classes))
-
-        # projection conv
-        self.dfl_conv = nn.Conv2D(self.reg_channels, 1, 1, bias_attr=False)
-        self.dfl_conv.skip_quant = True
-        self.proj = paddle.linspace(0, self.reg_channels - 1, self.reg_channels)
-        self.dfl_conv.weight.set_value(
-            self.proj.reshape([1, self.reg_channels, 1, 1]))
-        self.dfl_conv.weight.stop_gradient = True
-
-        # self._init_bias()
 
     def fuse(self):
         pass
@@ -396,9 +381,10 @@ class YOLOv7uHead(nn.Layer):
 
     def _init_bias(self):
         for a, b, s in zip(self.conv_reg, self.conv_cls, self.fpn_strides):
-            a[-1].bias.set_value(1.0)  # box
-            b[-1].bias[:self.num_classes] = math.log(5 / self.num_classes /
-                                                     (640 / s)**2)
+            constant_(a[-1].weight)
+            constant_(a[-1].bias, 1.0)
+            constant_(b[-1].weight)
+            constant_(b[-1].bias, math.log(5 / self.num_classes / (640 / s)**2))
 
     def forward(self, feats, targets=None):
         if self.training:
@@ -412,55 +398,50 @@ class YOLOv7uHead(nn.Layer):
                 feats, self.fpn_strides, self.grid_cell_scale,
                 self.grid_cell_offset)
 
-        cls_score_list, reg_distri_list = [], []
+        cls_logits_list, bbox_preds_list, bbox_dist_preds_list = [], [], []
         for i, feat in enumerate(feats):
-            reg_distri = self.im2[i](self.conv_reg[i](self.ia2[i](feat)))
+            _, _, h, w = feat.shape
+            l = h * w
+            # bbox_dist_preds = self.conv_reg[i](feat)
+            # cls_logit = self.conv_cls[i](feat)
+            bbox_dist_preds = self.im2[i](self.conv_reg[i](self.ia2[i](feat)))
             cls_logit = self.im3[i]((self.conv_cls[i](self.ia3[i](feat))))
+
+            bbox_dist_preds = bbox_dist_preds.reshape(
+                [-1, 4, self.reg_max, l]).transpose([0, 3, 1, 2])  # [8, 6400, 4, 16]
+            bbox_preds = F.softmax(bbox_dist_preds, axis=3).matmul(self.proj.reshape([-1, 1])).squeeze(-1) # [8, 6400, 4]
+
             # cls and reg
-            cls_score = F.sigmoid(cls_logit)
-            cls_score_list.append(cls_score.flatten(2).transpose([0, 2, 1]))
-            reg_distri_list.append(reg_distri.flatten(2).transpose([0, 2, 1]))
-        cls_score_list = paddle.concat(cls_score_list, axis=1)
-        reg_distri_list = paddle.concat(reg_distri_list, axis=1)
+            cls_logits_list.append(cls_logit)
+            bbox_preds_list.append(bbox_preds.transpose([0, 2, 1]).reshape([-1, 4, h, w]))
+            bbox_dist_preds_list.append(bbox_dist_preds)
 
         return self.get_loss([
-            cls_score_list, reg_distri_list, anchors, anchor_points,
+            cls_logits_list, bbox_preds_list, bbox_dist_preds_list, anchors, anchor_points,
             num_anchors_list, stride_tensor
         ], targets)
 
     def forward_eval(self, feats):
         anchor_points, stride_tensor = self._generate_anchors(feats)
 
-        cls_score_list, reg_dist_list = [], []
+        cls_logits_list, bbox_preds_list = [], []
         for i, feat in enumerate(feats):
             _, _, h, w = feat.shape
             l = h * w
-            # reg_dist = self.conv_reg[i](feat)
+            # bbox_dist_preds = self.conv_reg[i](feat)
             # cls_logit = self.conv_cls[i](feat)
-            reg_dist = self.im2[i](self.conv_reg[i](self.ia2[i](feat)))
+            bbox_dist_preds = self.im2[i](self.conv_reg[i](self.ia2[i](feat)))
             cls_logit = self.im3[i]((self.conv_cls[i](self.ia3[i](feat))))
 
-            reg_dist = reg_dist.reshape(
-                [-1, 4, self.reg_channels, l]).transpose(
-                    [0, 2, 3, 1])  # Note diff
-            if self.use_shared_conv:
-                reg_dist = self.dfl_conv(F.softmax(reg_dist, axis=1)).squeeze(1)
-                # [bs, l, 4]
-            else:
-                reg_dist = F.softmax(reg_dist, axis=1)
+            bbox_dist_preds = bbox_dist_preds.reshape(
+                [-1, 4, self.reg_max, l]).transpose([0, 3, 1, 2])  # [8, 6400, 4, 16]
+            bbox_preds = F.softmax(bbox_dist_preds, axis=3).matmul(self.proj.reshape([-1, 1])).squeeze(-1) # [8, 6400, 4]
+
             # cls and reg
-            cls_score = F.sigmoid(cls_logit)
-            cls_score_list.append(cls_score.reshape([-1, self.num_classes, l]))
-            reg_dist_list.append(reg_dist)
+            cls_logits_list.append(cls_logit)
+            bbox_preds_list.append(bbox_preds.transpose([0, 2, 1]).reshape([-1, 4, h, w]))
 
-        cls_score_list = paddle.concat(cls_score_list, axis=-1)
-        if self.use_shared_conv:
-            reg_dist_list = paddle.concat(reg_dist_list, axis=1)
-        else:
-            reg_dist_list = paddle.concat(reg_dist_list, axis=2)
-            reg_dist_list = self.dfl_conv(reg_dist_list).squeeze(1)
-
-        return cls_score_list, reg_dist_list, anchor_points, stride_tensor
+        return cls_logits_list, bbox_preds_list, anchor_points, stride_tensor
 
     def _generate_anchors(self, feats=None, dtype='float32'):
         # just use in eval time
@@ -484,25 +465,17 @@ class YOLOv7uHead(nn.Layer):
         stride_tensor = paddle.concat(stride_tensor)
         return anchor_points, stride_tensor
 
-    @staticmethod
-    def _varifocal_loss(pred_score, gt_score, label, alpha=0.75, gamma=2.0):
-        weight = alpha * pred_score.pow(gamma) * (1 - label) + gt_score * label
-        loss = F.binary_cross_entropy(
-            pred_score, gt_score, weight=weight, reduction='sum')
-        return loss
-
     def _bbox_decode(self, anchor_points, pred_dist):
         _, l, _ = get_static_shape(pred_dist)
-        pred_dist = F.softmax(pred_dist.reshape([-1, l, 4, self.reg_channels]))
-        pred_dist = self.dfl_conv(pred_dist.transpose([0, 3, 1, 2])).squeeze(1)
-        return batch_distance2bbox(anchor_points, pred_dist)
+        # pred_dist = F.softmax(pred_dist.reshape([-1, l, 4, self.reg_max]))
+        # pred_dist = self.dfl_conv(pred_dist.transpose([0, 3, 1, 2])).squeeze(1)
+        return batch_distance2bbox(anchor_points, pred_dist) # to xyxy
 
-    def _bbox2distance(self, points, bbox):
+    def _bbox2distance(self, points, bbox, reg_max=15, eps=0.01):
         x1y1, x2y2 = paddle.split(bbox, 2, -1)
         lt = points - x1y1
         rb = x2y2 - points
-        return paddle.concat([lt, rb], -1).clip(self.reg_range[0],
-                                                self.reg_range[1] - 1 - 0.01)
+        return paddle.concat([lt, rb], -1).clip(0, reg_max - eps)
 
     def _df_loss(self, pred_dist, target, lower_bound=0):
         target_left = paddle.cast(target.floor(), 'int64')
@@ -517,115 +490,161 @@ class YOLOv7uHead(nn.Layer):
             reduction='none') * weight_right
         return (loss_left + loss_right).mean(-1, keepdim=True)
 
-    def _bbox_loss(self, pred_dist, pred_bboxes, anchor_points, assigned_labels,
-                   assigned_bboxes, assigned_scores, assigned_scores_sum):
-        # select positive samples mask
-        mask_positive = (assigned_labels != self.num_classes)
-        num_pos = mask_positive.sum()
-        # pos/neg loss
-        if num_pos > 0:
-            # l1 + iou
-            bbox_mask = mask_positive.unsqueeze(-1).tile([1, 1, 4])
-            pred_bboxes_pos = paddle.masked_select(pred_bboxes,
-                                                   bbox_mask).reshape([-1, 4])
-            assigned_bboxes_pos = paddle.masked_select(
-                assigned_bboxes, bbox_mask).reshape([-1, 4])
-            bbox_weight = paddle.masked_select(
-                assigned_scores.sum(-1), mask_positive).unsqueeze(-1)
-
-            # loss_l1 just see if train well
-            if self.print_l1_loss:
-                loss_l1 = F.l1_loss(pred_bboxes_pos, assigned_bboxes_pos)
-            else:
-                loss_l1 = paddle.zeros([1])
-
-            # ciou loss
-            iou = bbox_iou(
-                pred_bboxes_pos, assigned_bboxes_pos, x1y1x2y2=False, ciou=True)
-            loss_iou = ((1.0 - iou) * bbox_weight).sum() / assigned_scores_sum
-
-            dist_mask = mask_positive.unsqueeze(-1).tile(
-                [1, 1, self.reg_channels * 4])
-            pred_dist_pos = paddle.masked_select(
-                pred_dist, dist_mask).reshape([-1, 4, self.reg_channels])
-            assigned_ltrb = self._bbox2distance(anchor_points, assigned_bboxes)
-            assigned_ltrb_pos = paddle.masked_select(
-                assigned_ltrb, bbox_mask).reshape([-1, 4])
-            loss_dfl = self._df_loss(pred_dist_pos, assigned_ltrb_pos,
-                                     self.reg_range[0]) * bbox_weight
-            loss_dfl = loss_dfl.sum() / assigned_scores_sum
-        else:
-            loss_l1 = paddle.zeros([1])
-            loss_iou = paddle.zeros([1])
-            loss_dfl = pred_dist.sum() * 0.
-        return loss_l1, loss_iou, loss_dfl
 
     def get_loss(self, head_outs, gt_meta):
-        pred_scores, pred_distri, anchors,\
+        cls_scores, bbox_preds, bbox_dist_preds, anchors,\
         anchor_points, num_anchors_list, stride_tensor = head_outs
 
-        anchor_points_s = anchor_points / stride_tensor
-        pred_bboxes = self._bbox_decode(anchor_points_s, pred_distri)
 
-        gt_labels = gt_meta['gt_class']
-        gt_bboxes = gt_meta['gt_bbox']
+        bs = cls_scores[0].shape[0]
+        # pred info
+        flatten_cls_preds = [
+            cls_pred.transpose([0, 2, 3, 1]).reshape([bs, -1, self.num_classes])
+            for cls_pred in cls_scores
+        ]
+        flatten_pred_bboxes = [
+            bbox_pred.transpose([0, 2, 3, 1]).reshape([bs, -1, 4])
+            for bbox_pred in bbox_preds
+        ]
+        # (bs, n, 4 * reg_max)
+        flatten_pred_dists = [
+            bbox_pred_org.reshape([bs, -1, self.reg_max * 4])
+            for bbox_pred_org in bbox_dist_preds
+        ]
+
+        flatten_dist_preds = paddle.concat(flatten_pred_dists, 1) # [8, 8400, 64]
+        pred_scores = paddle.concat(flatten_cls_preds, 1) # [8, 8400, 80]
+        pred_distri = paddle.concat(flatten_pred_bboxes, 1) # [8, 8400, 4]
+
+
+        anchor_points_s = anchor_points / stride_tensor
+        pred_bboxes = self._bbox_decode(anchor_points_s, pred_distri) # 9345410.  [8, 8400, 4]
+        pred_bboxes = pred_bboxes * stride_tensor # must *stride
+
+        gt_labels = gt_meta['gt_class'] # [16, 51, 1]
+        gt_bboxes = gt_meta['gt_bbox'] # xyxy max=640 # [16, 51, 4]
         pad_gt_mask = gt_meta['pad_gt_mask']
+        # pad_gt_mask = paddle.cast((gt_bboxes.sum(-1, keepdim=True) > 0), 'float32')
+
         # label assignment
+        #          [8, 8400, 4]  80842408.  8781976.      assigned_scores 131.79727173
         assigned_labels, assigned_bboxes, assigned_scores = \
             self.assigner(
-            pred_scores.detach(),
-            pred_bboxes.detach() * stride_tensor,
+            #pred_scores.detach(),
+            F.sigmoid(pred_scores.detach()),
+            pred_bboxes.detach(), # * stride_tensor,
             anchor_points,
             num_anchors_list,
             gt_labels,
-            gt_bboxes,
+            gt_bboxes, # xyxy
             pad_gt_mask,
             bg_index=self.num_classes)
         # rescale bbox
+        # print('assigned_scores ', assigned_scores.max(), assigned_scores.sum())
         assigned_bboxes /= stride_tensor
+        pred_bboxes /= stride_tensor ###
+
         # cls loss
-        if self.use_varifocal_loss:
-            one_hot_label = F.one_hot(assigned_labels,
-                                      self.num_classes + 1)[..., :-1]
-            loss_cls = self._varifocal_loss(pred_scores, assigned_scores,
-                                            one_hot_label)
-        else:
-            loss_cls = self.bce(pred_scores, assigned_scores)
+        #loss_cls = self.bce(pred_scores, assigned_scores).sum() # [16, 8400, 80]
+        loss_cls = F.binary_cross_entropy_with_logits(pred_scores, assigned_scores, reduction='none').sum() # [16, 8400, 80]
 
         assigned_scores_sum = assigned_scores.sum()
         if paddle.distributed.get_world_size() > 1:
             paddle.distributed.all_reduce(assigned_scores_sum)
             assigned_scores_sum /= paddle.distributed.get_world_size()
         assigned_scores_sum = paddle.clip(assigned_scores_sum, min=1.)
-        # loss_cls /= assigned_scores_sum
 
-        loss_l1, loss_iou, loss_dfl = \
-            self._bbox_loss(pred_distri, pred_bboxes, anchor_points_s,
-                            assigned_labels, assigned_bboxes, assigned_scores,
-                            assigned_scores_sum)
-        loss = self.loss_weight['class'] * loss_cls + \
-               self.loss_weight['iou'] * loss_iou + \
-               self.loss_weight['dfl'] * loss_dfl
+        loss_cls /= assigned_scores_sum
+
+        # select positive samples mask
+        mask_positive = (assigned_labels != self.num_classes)
+        num_pos = mask_positive.sum()
+        # pos/neg loss
+        if num_pos > 0:
+            # ciou loss
+            bbox_mask = mask_positive.unsqueeze(-1).tile([1, 1, 4])
+            pred_bboxes_pos = paddle.masked_select(
+                pred_bboxes, bbox_mask).reshape([-1, 4])
+            assigned_bboxes_pos = paddle.masked_select(
+                assigned_bboxes, bbox_mask).reshape([-1, 4])
+            bbox_weight = paddle.masked_select(
+                assigned_scores.sum(-1), mask_positive).unsqueeze(-1)
+            iou = bbox_iou( 
+                pred_bboxes_pos.split(4, axis=-1),
+                assigned_bboxes_pos.split(4, axis=-1),
+                x1y1x2y2=True, # xyxy
+                ciou=True,
+                eps=1e-7)
+            loss_iou = ((1.0 - iou) * bbox_weight).sum() / assigned_scores_sum
+
+            # loss_l1 just see if train well
+            if self.print_l1_loss:
+                loss_l1 = F.l1_loss(pred_bboxes_pos, assigned_bboxes_pos)
+            else:
+                loss_l1 = flatten_dist_preds.sum() * 0.
+
+            # dfl loss
+            dist_mask = mask_positive.unsqueeze(-1).tile(
+                [1, 1, self.reg_max * 4])
+            pred_dist_pos = paddle.masked_select(
+                flatten_dist_preds, dist_mask).reshape([-1, 4, self.reg_max])
+            assigned_ltrb = self._bbox2distance(
+                anchor_points_s,
+                assigned_bboxes,
+                reg_max=self.reg_max - 1,
+                eps=0.01)
+            assigned_ltrb_pos = paddle.masked_select(
+                assigned_ltrb, bbox_mask).reshape([-1, 4])
+
+            loss_dfl = self._df_loss(pred_dist_pos,
+                                     assigned_ltrb_pos) * bbox_weight
+            loss_dfl = loss_dfl.sum() / assigned_scores_sum
+        else:
+            loss_iou = flatten_dist_preds.sum() * 0.
+            loss_dfl = flatten_dist_preds.sum() * 0.
+            loss_l1 = flatten_dist_preds.sum() * 0.
+
+
+        loss_cls *= self.loss_weight['class']
+        loss_iou *= self.loss_weight['iou']
+        loss_dfl *= self.loss_weight['dfl']
+        loss_total = loss_cls + loss_iou + loss_dfl
+        # bs = head_outs[0].shape[0]
+        num_gpus = gt_meta.get('num_gpus', 8)
+        total_bs = bs * num_gpus
+
         out_dict = {
-            'loss': loss,
-            'loss_cls': loss_cls,
-            'loss_iou': loss_iou,
-            'loss_dfl': loss_dfl,
+            'loss': loss_total * total_bs,
+            'loss_cls': loss_cls * total_bs,
+            'loss_iou': loss_iou * total_bs,
+            'loss_dfl': loss_dfl * total_bs,
         }
         if self.print_l1_loss:
             # just see convergence
-            out_dict.update({'loss_l1': loss_l1})
+            out_dict.update({'loss_l1': loss_l1 * total_bs})
         return out_dict
 
     def post_process(self, head_outs, im_shape, scale_factor):
-        pred_scores, pred_dist, anchor_points, stride_tensor = head_outs
-        pred_bboxes = batch_distance2bbox(anchor_points, pred_dist)
+        pred_scores_list, pred_dist_list, anchor_points, stride_tensor = head_outs
+        bs = pred_scores_list[0].shape[0]
+        pred_scores = [
+            cls_score.transpose([0, 2, 3, 1]).reshape([bs, -1, self.num_classes])
+            for cls_score in pred_scores_list
+        ]
+        pred_dists = [
+            bbox_pred.transpose([0, 2, 3, 1]).reshape([bs, -1, 4])
+            for bbox_pred in pred_dist_list
+        ]
+        pred_scores = F.sigmoid(paddle.concat(pred_scores, 1)) # [8, 8400, 80]
+        pred_bboxes = paddle.concat(pred_dists, 1) # [8, 8400, 4]
+
+        pred_bboxes = batch_distance2bbox(anchor_points, pred_bboxes)
         pred_bboxes *= stride_tensor
 
         if self.exclude_post_process:
-            return paddle.concat(
-                [pred_bboxes, pred_scores.transpose([0, 2, 1])], axis=-1)
+            return paddle.concat([pred_bboxes, pred_scores], axis=-1)
         else:
+            pred_scores = pred_scores.transpose([0, 2, 1])
             # scale bbox to origin
             scale_factor = scale_factor.flip(-1).tile([1, 2]).unsqueeze(1)
             pred_bboxes /= scale_factor

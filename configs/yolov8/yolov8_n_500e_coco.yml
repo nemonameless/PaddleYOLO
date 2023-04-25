@@ -9,7 +9,7 @@ depth_mult: 0.33
 width_mult: 0.25
 
 log_iter: 50
-snapshot_epoch: 2
+snapshot_epoch: 5
 weights: output/yolov8_n_500e_coco/model_final
 
 
