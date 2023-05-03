@@ -13,7 +13,7 @@ EvalReader:
     - Pad: {size: [320, 320], fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 8
+  batch_size: 1
 
 
 TestReader:

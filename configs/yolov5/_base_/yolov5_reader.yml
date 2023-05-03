@@ -4,16 +4,18 @@ input_size: &input_size [*input_height, *input_width]
 mosaic_epoch: &mosaic_epoch 300
 
 worker_num: 4
-TrainReader:
+TrainReader1:
   sample_transforms:
-    - Decode: {}
-    - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size}
+    - DecodeNormResize: {target_size: *input_size, mosaic: True}
+    #- DecodeNormResizeCache: {cache_root: 'dataset/coco/cache/buffer_bgr', target_size: *input_size, mosaic: True}
+    - MosaicPerspective: {mosaic_prob: 1.0, target_size: 640}
     - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
     - RandomFlip: {}
     - BboxXYXY2XYWH: {}
     - NormalizeBox: {}
   batch_transforms:
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+    - RGBReverse: {} # bgr->rgb
     - Permute: {}
     - PadGT: {}
   batch_size: 8
@@ -24,6 +26,26 @@ TrainReader:
   mosaic_epoch: *mosaic_epoch
 
 
+TrainReader:
+  sample_transforms:
+    - DecodeNormResize: {target_size: *input_size, mosaic: True}
+    # - DecodeNormResizeCache: {cache_root: 'dataset/coco/cache/buffer', target_size: *input_size, mosaic: True}
+    - MosaicPerspective: {mosaic_prob: 1.0, target_size: 640}
+    - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
+    - RandomFlip: {}
+    - BboxXYXY2XYWH: {}
+    - NormalizeBox: {}
+    - NormalizeImage: {mean: [0, 0, 0], std: [1, 1, 1], is_scale: True}
+    - RGBReverse: {} # bgr->rgb
+    - Permute: {}
+  batch_size: 8
+  shuffle: True
+  drop_last: False
+  use_shared_memory: False
+  collate_batch: False
+  mosaic_epoch: *mosaic_epoch
+
+
 EvalReader:
   sample_transforms:
     - Decode: {}
@@ -31,7 +53,7 @@ EvalReader:
     - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 8
+  batch_size: 1
 
 
 TestReader:

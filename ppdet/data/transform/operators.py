@@ -108,6 +108,20 @@ class BaseOperator(object):
 
 
 @register_op
+class RGBReverse(BaseOperator):
+    """RGB to BGR, or BGR to RGB, sensitive to MOTRandomAffine
+    """
+
+    def __init__(self):
+        super(RGBReverse, self).__init__()
+
+    def apply(self, sample, context=None):
+        im = sample['image']
+        sample['image'] = np.ascontiguousarray(im[:, :, ::-1])
+        return sample
+
+
+@register_op
 class RandomHSV(BaseOperator):
     """
     HSV color-space augmentation
@@ -138,19 +152,11 @@ class RandomHSV(BaseOperator):
 class MosaicPerspective(BaseOperator):
     """
     Mosaic Data Augmentation and Perspective
-    The code is based on https://github.com/WongKinYiu/yolov7
-
-    1. get mosaic coords, _mosaic_preprocess, get mosaic_labels
-    2. random_perspective augment
-    3. copy_paste,mixup,paste_in
     """
 
     def __init__(self,
-                 target_size=[640, 640],
                  mosaic_prob=1.0,
-                 mixup_prob=0.0,
-                 copy_paste_prob=0.0,
-                 paste_in_prob=0.0,
+                 target_size=640,
                  fill_value=114,
                  degrees=0.0,
                  translate=0.1,
@@ -159,14 +165,8 @@ class MosaicPerspective(BaseOperator):
                  perspective=0.0):
         super(MosaicPerspective, self).__init__()
         self.mosaic_prob = mosaic_prob
-        self.mixup_prob = mixup_prob
-        self.copy_paste_prob = copy_paste_prob  # no use
-        self.paste_in_prob = paste_in_prob
-
-        if isinstance(target_size, Integral):
-            target_size = [target_size, target_size]
         self.target_size = target_size
-        self.mosaic_border = (-target_size[0] // 2, -target_size[1] // 2)
+        self.mosaic_border = (-target_size // 2, -target_size // 2)
         self.fill_value = fill_value
         self.degrees = degrees
         self.translate = translate
@@ -174,25 +174,23 @@ class MosaicPerspective(BaseOperator):
         self.shear = shear
         self.perspective = perspective
 
-    def _mosaic4_preprocess(self, sample):
-        s = self.target_size[0]
+    def xywhn2xyxy(self, x, w=640, h=640, padw=0, padh=0):
+        # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+        y = np.copy(x)
+        y[:, 0] = w * (x[:, 0] - x[:, 2] / 2) + padw  # top left x
+        y[:, 1] = h * (x[:, 1] - x[:, 3] / 2) + padh  # top left y
+        y[:, 2] = w * (x[:, 0] + x[:, 2] / 2) + padw  # bottom right x
+        y[:, 3] = h * (x[:, 1] + x[:, 3] / 2) + padh  # bottom right y
+        return y
+
+    def _mosaic_preprocess(self, sample):
+        s = self.target_size
         # select mosaic center (x, y)
         yc, xc = (int(random.uniform(-x, 2 * s + x))
                   for x in self.mosaic_border)
         gt_bboxes = [x['gt_bbox'] for x in sample]
         for i in range(len(sample)):
-            ori_im = sample[i]['image']
-            h0, w0 = ori_im.shape[:2]
-            # get resized img
-            scale = min(1. * s / h0, 1. * s / w0)
-            if scale != 1:  # if sizes are not equal
-                im = cv2.resize(
-                    ori_im, (int(w0 * scale), int(h0 * scale)),
-                    interpolation=cv2.INTER_LINEAR
-                    if scale > 1 else cv2.INTER_AREA).astype(np.uint8)
-            else:
-                im = ori_im
-
+            im = sample[i]['image']
             h, w, c = im.shape
             # x1a, y1a, x2a, y2a: large image
             # x1b, y1b, x2b, y2b: small image
@@ -219,42 +217,12 @@ class MosaicPerspective(BaseOperator):
             image[y1a:y2a, x1a:x2a] = im[y1b:y2b, x1b:x2b]
             padw = x1a - x1b
             padh = y1a - y1b
-            gt_bboxes[i][:, 0] = scale * gt_bboxes[i][:, 0] + padw
-            gt_bboxes[i][:, 1] = scale * gt_bboxes[i][:, 1] + padh
-            gt_bboxes[i][:, 2] = scale * gt_bboxes[i][:, 2] + padw
-            gt_bboxes[i][:, 3] = scale * gt_bboxes[i][:, 3] + padh
+            gt_bboxes[i] = self.xywhn2xyxy(gt_bboxes[i], w, h, padw, padh)
 
         gt_bboxes = np.concatenate(gt_bboxes, axis=0)
         gt_bboxes = np.clip(gt_bboxes, 0, s * 2)
-        gt_classes = [x['gt_class'] for x in sample]
-        gt_classes = np.concatenate(gt_classes, axis=0)
-        return image, gt_classes, gt_bboxes
 
-    def letterbox_resize(self,
-                         img,
-                         gt_bboxes,
-                         new_shape=(640, 640),
-                         color=(114, 114, 114)):
-        shape = img.shape[:2]  # [height, width]
-        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
-        # r = min(r, 1.0)
-        ratio = r, r
-        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
-        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]
-        dw /= 2
-        dh /= 2
-        if shape[::-1] != new_unpad:
-            img = cv2.resize(img, new_unpad, interpolation=cv2.INTER_LINEAR)
-        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-        img = cv2.copyMakeBorder(
-            img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-
-        gt_bboxes[:, 0] = ratio[0] * gt_bboxes[:, 0] + dw
-        gt_bboxes[:, 1] = ratio[1] * gt_bboxes[:, 1] + dh
-        gt_bboxes[:, 2] = ratio[0] * gt_bboxes[:, 2] + dw
-        gt_bboxes[:, 3] = ratio[1] * gt_bboxes[:, 3] + dh
-        return img, gt_bboxes
+        return image, gt_bboxes
 
     def random_perspective(self,
                            im,
@@ -266,6 +234,9 @@ class MosaicPerspective(BaseOperator):
                            shear=10,
                            perspective=0.0,
                            border=(0, 0)):
+        # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
+        # targets = [cls, xyxy]
+
         targets = np.concatenate((gt_classes, gt_box), 1)
         height = im.shape[0] + border[0] * 2  # shape(h,w,c)
         width = im.shape[1] + border[1] * 2
@@ -374,41 +345,21 @@ class MosaicPerspective(BaseOperator):
         # current sample and other 3 samples to a new sample
         if not isinstance(sample, Sequence):
             return sample
-        # assert len(sample) == 5 or len(
-        #     sample) == 10, 'YOLOv5 Mosaic need 4 or 9 samples and 1 for mixup'
+        sample = sample[:-1]  # exclude last one (mixup)
+        assert len(sample) == 4 or len(
+            sample) == 9, 'YOLOv5 Mosaic need 4 or 9 samples'
 
-        # 0.no mosaic
         if random.random() >= self.mosaic_prob:
-            sample0 = sample[0]
-            sample0['image'], sample0['gt_bbox'] = self.letterbox_resize(
-                sample0['image'], sample0['gt_bbox'], self.target_size)
-            return sample0
+            return sample[0]
+        random.shuffle(sample)
+        mosaic_img, mosaic_gt_bboxes = self._mosaic_preprocess(sample)
 
-        # 1._mosaic_preprocess
-        mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self._mosaic4_preprocess(
-            sample[:4])
-
-        # 2.random_perspective
-        mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self.random_perspective(
-            mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes, self.degrees,
+        gt_classes = np.concatenate([x['gt_class'] for x in sample], axis=0)
+        mosaic_img, gt_classes, mosaic_gt_bboxes = self.random_perspective(
+            mosaic_img, gt_classes, mosaic_gt_bboxes, self.degrees,
             self.translate, self.scale, self.shear, self.perspective,
             self.mosaic_border)
 
-        # 3.copy_paste
-        # 4.mixup
-        if len(mosaic_gt_bboxes) and random.random() < self.mixup_prob:
-            sample4 = sample[4]
-            img4, gt_bboxes = self.letterbox_resize(
-                sample4['image'], sample4['gt_bbox'], self.target_size)
-
-            r = np.random.beta(8.0, 8.0)
-            mosaic_img = (mosaic_img * r + img4 * (1 - r))  #.astype(np.uint8)
-            mosaic_gt_classes = np.concatenate(
-                (mosaic_gt_classes, sample4['gt_class']), 0)
-            mosaic_gt_bboxes = np.concatenate((mosaic_gt_bboxes, gt_bboxes), 0)
-
-        # 5.paste_in
-        # 6.clip
         nl = len(mosaic_gt_bboxes)
         eps = 1E-3
         if nl:
@@ -417,9 +368,9 @@ class MosaicPerspective(BaseOperator):
                 (mosaic_img.shape[0] - eps, mosaic_img.shape[1] - eps))
 
         sample = sample[0]  # list to one sample
-        sample['image'] = mosaic_img.astype(np.uint8)
+        sample['image'] = mosaic_img  #.astype(np.uint8)
         sample['gt_bbox'] = mosaic_gt_bboxes
-        sample['gt_class'] = mosaic_gt_classes
+        sample['gt_class'] = gt_classes
 
         if 'difficult' in sample:
             sample.pop('difficult')
@@ -3603,3 +3554,201 @@ class PadResize(BaseOperator):
         if 'difficult' in sample:
             sample.pop('difficult')
         return sample
+
+
+@register_op
+class DecodeNormResize(BaseOperator):
+    def __init__(self, target_size, to_rgb=False, mosaic=True):
+        super(DecodeNormResize, self).__init__()
+        if not isinstance(target_size, (Integral, Sequence)):
+            raise TypeError(
+                "Type of target_size is invalid. Must be Integer or List or Tuple, now is {}".
+                format(type(target_size)))
+        if isinstance(target_size, Integral):
+            target_size = [target_size, target_size]
+        self.target_size = target_size
+        self.to_rgb = to_rgb
+        self.mosaic = mosaic
+
+    def bbox_norm(self, sample):
+        assert 'gt_bbox' in sample
+        bbox = sample['gt_bbox']
+        height, width = sample['image'].shape[:2]
+        y = bbox.copy()
+        y[:, 0] = ((bbox[:, 0] + bbox[:, 2]) / 2) / width  # x center
+        y[:, 1] = ((bbox[:, 1] + bbox[:, 3]) / 2) / height  # y center
+        y[:, 2] = (bbox[:, 2] - bbox[:, 0]) / width  # width
+        y[:, 3] = (bbox[:, 3] - bbox[:, 1]) / height  # height
+        sample['gt_bbox'] = y
+        return sample
+
+    def load_resized_img(self, sample, target_size):
+        if 'image' not in sample:
+            img_file = sample['im_file']
+            sample['image'] = cv2.imread(img_file)  # BGR
+            sample.pop('im_file')
+        im = sample['image']
+        sample = self.bbox_norm(sample)
+
+        if 'keep_ori_im' in sample and sample['keep_ori_im']:
+            sample['ori_image'] = im
+
+        if 'h' not in sample:
+            sample['h'] = im.shape[0]
+        elif sample['h'] != im.shape[0]:
+            logger.warning(
+                "The actual image height: {} is not equal to the "
+                "height: {} in annotation, and update sample['h'] by actual "
+                "image height.".format(im.shape[0], sample['h']))
+            sample['h'] = im.shape[0]
+        if 'w' not in sample:
+            sample['w'] = im.shape[1]
+        elif sample['w'] != im.shape[1]:
+            logger.warning(
+                "The actual image width: {} is not equal to the "
+                "width: {} in annotation, and update sample['w'] by actual "
+                "image width.".format(im.shape[1], sample['w']))
+            sample['w'] = im.shape[1]
+
+        sample['im_shape'] = np.array(
+            im.shape[:2], dtype=np.float32)  # original shape
+
+        # get resized img
+        r = min(target_size[0] / im.shape[0], target_size[1] / im.shape[1])
+        if r != 1:  # if sizes are not equal
+            resized_img = cv2.resize(
+                im, (int(im.shape[1] * r), int(im.shape[0] * r)),
+                interpolation=cv2.INTER_LINEAR if (self.mosaic or r > 1) else
+                cv2.INTER_AREA)  ########## .astype(np.uint8)
+        else:
+            resized_img = im
+
+        h, w = resized_img.shape[:2]
+        if self.to_rgb:
+            resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+
+        sample['image'] = resized_img
+        sample['scale_factor'] = np.array(
+            [h / im.shape[0], w / im.shape[1]], dtype=np.float32)
+        return sample
+
+    def apply(self, sample, context=None):
+        sample = self.load_resized_img(sample, self.target_size)
+        return sample
+
+
+@register_op
+class DecodeNormResizeCache(BaseOperator):
+    def __init__(self, cache_root, target_size, to_rgb=False, mosaic=True):
+        super(DecodeNormResizeCache, self).__init__()
+        if not isinstance(target_size, (Integral, Sequence)):
+            raise TypeError(
+                "Type of target_size is invalid. Must be Integer or List or Tuple, now is {}".
+                format(type(target_size)))
+        if isinstance(target_size, Integral):
+            target_size = [target_size, target_size]
+        self.target_size = target_size
+        self.to_rgb = to_rgb
+        self.mosaic = mosaic
+
+        self.use_cache = False if cache_root is None else True
+        self.cache_root = cache_root
+        if cache_root is not None:
+            _make_dirs(cache_root)
+
+    def bbox_norm(self, sample):
+        assert 'gt_bbox' in sample
+        bbox = sample['gt_bbox']
+        height, width = sample['image'].shape[:2]
+        y = bbox.copy()
+        y[:, 0] = ((bbox[:, 0] + bbox[:, 2]) / 2) / width  # x center
+        y[:, 1] = ((bbox[:, 1] + bbox[:, 3]) / 2) / height  # y center
+        y[:, 2] = (bbox[:, 2] - bbox[:, 0]) / width  # width
+        y[:, 3] = (bbox[:, 3] - bbox[:, 1]) / height  # height
+        sample['gt_bbox'] = y
+        return sample
+
+    def load_resized_img(self, sample, target_size):
+        if self.use_cache and os.path.exists(
+                self.cache_path(self.cache_root, sample['im_file'])):
+            path = self.cache_path(self.cache_root, sample['im_file'])
+            im = self.load(path)
+            # im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+            sample['image'] = im
+        else:
+            if 'image' not in sample:
+                img_file = sample['im_file']
+                sample['image'] = cv2.imread(img_file)  # BGR
+                sample.pop('im_file')
+            im = sample['image']
+
+        sample = self.bbox_norm(sample)
+
+        if 'keep_ori_im' in sample and sample['keep_ori_im']:
+            sample['ori_image'] = im
+
+        if 'h' not in sample:
+            sample['h'] = im.shape[0]
+        elif sample['h'] != im.shape[0]:
+            logger.warning(
+                "The actual image height: {} is not equal to the "
+                "height: {} in annotation, and update sample['h'] by actual "
+                "image height.".format(im.shape[0], sample['h']))
+            sample['h'] = im.shape[0]
+        if 'w' not in sample:
+            sample['w'] = im.shape[1]
+        elif sample['w'] != im.shape[1]:
+            logger.warning(
+                "The actual image width: {} is not equal to the "
+                "width: {} in annotation, and update sample['w'] by actual "
+                "image width.".format(im.shape[1], sample['w']))
+            sample['w'] = im.shape[1]
+
+        sample['im_shape'] = np.array(
+            im.shape[:2], dtype=np.float32)  # original shape
+
+        # get resized img
+        r = min(target_size[0] / im.shape[0], target_size[1] / im.shape[1])
+        if r != 1:  # if sizes are not equal
+            resized_img = cv2.resize(
+                im, (int(im.shape[1] * r), int(im.shape[0] * r)),
+                interpolation=cv2.INTER_LINEAR if (self.mosaic or r > 1) else
+                cv2.INTER_AREA)  ########## .astype(np.uint8)
+        else:
+            resized_img = im
+
+        h, w = resized_img.shape[:2]
+        if self.to_rgb:
+            resized_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+
+        sample['image'] = resized_img
+        sample['scale_factor'] = np.array(
+            [h / im.shape[0], w / im.shape[1]], dtype=np.float32)
+        return sample
+
+    def apply(self, sample, context=None):
+        sample = self.load_resized_img(sample, self.target_size)
+        return sample
+
+    @staticmethod
+    def cache_path(dir_oot, im_file):
+        return os.path.join(dir_oot, os.path.basename(im_file) + '.pkl')
+
+    @staticmethod
+    def load(path):
+        with open(path, 'rb') as f:
+            im = pickle.load(f)
+        return im
+
+    @staticmethod
+    def dump(obj, path):
+        MUTEX.acquire()
+        try:
+            with open(path, 'wb') as f:
+                pickle.dump(obj, f)
+
+        except Exception as e:
+            logger.warning('dump {} occurs exception {}'.format(path, str(e)))
+
+        finally:
+            MUTEX.release()

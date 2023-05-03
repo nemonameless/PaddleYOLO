@@ -1,5 +1,5 @@
 architecture: YOLOv7
-# norm_type: sync_bn
+norm_type: sync_bn
 use_ema: True
 ema_decay: 0.9999
 ema_decay_type: "exponential"
@@ -35,7 +35,7 @@ YOLOv7Head:
   loss: YOLOv7Loss
   nms:
     name: MultiClassNMS
-    nms_top_k: 10000
+    nms_top_k: 3000
     keep_top_k: 300
     score_threshold: 0.001
     nms_threshold: 0.7

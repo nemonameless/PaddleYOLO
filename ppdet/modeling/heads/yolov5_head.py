@@ -103,7 +103,7 @@ class YOLOv5Head(nn.Layer):
         for i, conv in enumerate(self.yolo_outputs):
             b = conv.bias.numpy().reshape([3, -1])
             b[:, 4] += math.log(8 / (640 / self.stride[i])**2)
-            b[:, 5:] += math.log(0.6 / (self.num_classes - 0.999999))
+            b[:, 5:self.num_classes + 5] += math.log(0.6 / (self.num_classes - 0.999999))
             conv.bias.set_value(b.reshape([-1]))
 
     @classmethod

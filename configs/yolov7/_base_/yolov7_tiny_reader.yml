@@ -4,7 +4,7 @@ input_size: &input_size [*input_height, *input_width]
 mosaic_epoch: &mosaic_epoch 300
 
 worker_num: 4
-TrainReader:
+TrainReader0:
   sample_transforms:
     - Decode: {}
     - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size, mixup_prob: 0.05, paste_in_prob: 0.05, translate: 0.1, scale: 0.5}
@@ -24,14 +24,35 @@ TrainReader:
   mosaic_epoch: *mosaic_epoch
 
 
+worker_num: 4
+TrainReader:
+  sample_transforms:
+    - DecodeNormResize: {target_size: *input_size, mosaic: True}
+    # - DecodeNormResizeCache: {cache_root: 'dataset/coco/cache/buffer', target_size: *input_size, mosaic: True}
+    - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_height}
+    - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
+    - RandomFlip: {}
+    - BboxXYXY2XYWH: {}
+    - NormalizeBox: {}
+    - NormalizeImage: {mean: [0, 0, 0], std: [1, 1, 1], is_scale: True}
+    - RGBReverse: {} # bgr->rgb
+    - Permute: {}
+  batch_size: 32
+  shuffle: True
+  drop_last: False
+  use_shared_memory: False
+  collate_batch: False
+  mosaic_epoch: *mosaic_epoch
+
+
 EvalReader:
   sample_transforms:
     - Decode: {}
-    - Resize: {target_size: [640, 640], keep_ratio: True, interp: 1}
-    - Pad: {size: [640, 640], fill_value: [114., 114., 114.]}
+    - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
+    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 8
+  batch_size: 1
 
 
 TestReader:
@@ -39,8 +60,8 @@ TestReader:
     image_shape: [3, 640, 640]
   sample_transforms:
     - Decode: {}
-    - Resize: {target_size: [640, 640], keep_ratio: True, interp: 1}
-    - Pad: {size: [640, 640], fill_value: [114., 114., 114.]}
+    - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
+    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
   batch_size: 1

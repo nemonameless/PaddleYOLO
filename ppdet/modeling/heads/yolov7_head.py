@@ -141,9 +141,7 @@ class YOLOv7Head(nn.Layer):
                     'yolo_output_im.{}'.format(i), im)
                 self.im.append(yolo_output_im)
 
-        self._initialize_biases(self.yolo_outputs)
-        if self.use_aux:
-            self._initialize_biases(self.yolo_outputs_aux)
+        self._initialize_biases()
 
     def fuse(self):
         if self.use_implicit:
@@ -166,13 +164,20 @@ class YOLOv7Head(nn.Layer):
                     self.yolo_outputs[i].weight * paddle.transpose(
                         self.im[i].im, [1, 0, 2, 3]))
 
-    def _initialize_biases(self, convs):
+    def _initialize_biases(self):
         # initialize biases, see https://arxiv.org/abs/1708.02002 section 3.3
-        for i, conv in enumerate(convs):
+        for i, conv in enumerate(self.yolo_outputs):
             b = conv.bias.numpy().reshape([3, -1])  # [255] to [3,85]
             b[:, 4] += math.log(8 / (640 / self.stride[i])**2)
-            b[:, 5:] += math.log(0.6 / (self.num_classes - 0.99))
+            b[:, 5:self.num_classes + 5] += math.log(0.6 / (self.num_classes - 0.999999))
             conv.bias.set_value(b.reshape([-1]))
+
+        if self.use_aux:
+            for i, conv in enumerate(self.yolo_outputs_aux):
+                b = conv.bias.numpy().reshape([3, -1])  # [255] to [3,85]
+                b[:, 4] += math.log(8 / (640 / self.stride[i])**2)
+                b[:, 5:] += math.log(0.6 / (self.num_classes - 0.999999))
+                conv.bias.set_value(b.reshape([-1]))
 
     @classmethod
     def from_config(cls, cfg, input_shape):

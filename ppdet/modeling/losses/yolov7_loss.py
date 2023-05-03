@@ -102,24 +102,42 @@ class YOLOv7Loss(nn.Layer):
                 inputs.append(pi)
 
         # 2.generate targets_labels [nt, 6] from gt_targets(dict)
-        # gt_targets['gt_class'] [bs, max_gt_nums, 1]
-        # gt_targets['gt_bbox'] [bs, max_gt_nums, 4]
-        # gt_targets['pad_gt_mask'] [bs, max_gt_nums, 1]
         anchors = anchors.numpy()
-        gt_nums = gt_targets['pad_gt_mask'].sum(1).squeeze(-1).numpy()
-        batch_size = head_outs[0].shape[0]
-        targets_labels = []  # [nt, 6]
-        for idx in range(batch_size):
-            gt_num = int(gt_nums[idx])
-            if gt_num == 0:
-                continue
-            gt_bbox = gt_targets['gt_bbox'][idx][:gt_num].reshape(
-                [-1, 4]).numpy()
-            gt_class = gt_targets['gt_class'][idx][:gt_num].reshape(
-                [-1, 1]).numpy() * 1.0
-            img_idx = np.repeat(np.array([[idx]]), gt_num, axis=0)
-            targets_labels.append(
-                np.concatenate((img_idx, gt_class, gt_bbox), -1))
+        if 0:
+            # collate_batch True
+            # gt_targets['gt_class'] [bs, max_gt_nums, 1]
+            # gt_targets['gt_bbox'] [bs, max_gt_nums, 4]
+            # gt_targets['pad_gt_mask'] [bs, max_gt_nums, 1]
+            gt_nums = gt_targets['pad_gt_mask'].sum(1).squeeze(-1).numpy()
+            batch_size = head_outs[0].shape[0]
+            targets_labels = []  # [nt, 6]
+            for idx in range(batch_size):
+                gt_num = int(gt_nums[idx])
+                if gt_num == 0:
+                    continue
+                gt_bbox = gt_targets['gt_bbox'][idx][:gt_num].reshape(
+                    [-1, 4]).numpy()
+                gt_class = gt_targets['gt_class'][idx][:gt_num].reshape(
+                    [-1, 1]).numpy() * 1.0
+                img_idx = np.repeat(np.array([[idx]]), gt_num, axis=0)
+                targets_labels.append(
+                    np.concatenate((img_idx, gt_class, gt_bbox), -1))
+        else:
+            gt_nums = [len(bbox) for bbox in gt_targets['gt_bbox']]
+            batch_size = head_outs[0].shape[0]
+            targets_labels = []  # [nt, 6]
+            for idx in range(batch_size):
+                gt_num = int(gt_nums[idx])
+                if gt_num == 0:
+                    continue
+                gt_bbox = gt_targets['gt_bbox'][idx][:gt_num].reshape(
+                    [-1, 4])
+                gt_class = gt_targets['gt_class'][idx][:gt_num].reshape(
+                    [-1, 1]) * 1.0
+                img_idx = np.repeat(np.array([[idx]]), gt_num, axis=0)
+                targets_labels.append(
+                    np.concatenate((img_idx, gt_class, gt_bbox), -1))
+
         if (len(targets_labels)):
             targets_labels = np.concatenate(targets_labels)
         else:
