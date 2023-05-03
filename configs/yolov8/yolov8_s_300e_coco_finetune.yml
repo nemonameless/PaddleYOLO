@@ -1,0 +1,67 @@
+_BASE_: [
+  '../datasets/coco_detection.yml',
+  '../runtime.yml',
+  '_base_/optimizer_300e.yml',
+  '_base_/yolov8_cspdarknet.yml',
+  '_base_/yolov8_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.50
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov8_s_300e_coco_finetune/model_final
+pretrain_weights: https://paddledet.bj.bcebos.com/models/yolov8_s_500e_coco.pdparams
+
+
+input_height: &input_height 640
+input_width: &input_width 640
+input_size: &input_size [*input_height, *input_width]
+mosaic_epoch: &mosaic_epoch 290 # last 10 epochs close mosaic, totally 500 epochs as default
+worker_num: 4
+TrainReader:
+  sample_transforms:
+    - Decode: {}
+    # - DecodeCache: {cache_root: 'dataset/coco/cache/buffer'}
+    - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size}
+    - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
+    - RandomFlip: {}
+  batch_transforms:
+    - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+    - Permute: {}
+    - PadGT: {}
+  batch_size: 16 # default 8 gpus, total bs = 128
+  shuffle: True
+  drop_last: False
+  use_shared_memory: True
+  collate_batch: True
+  mosaic_epoch: *mosaic_epoch
+
+EvalReader:
+  sample_transforms:
+    - Decode: {}
+    - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
+    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
+    - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+    - Permute: {}
+  batch_size: 8
+
+
+epoch: 300
+LearningRate:
+  base_lr: 0.001 # 0.01
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 300
+    min_lr_ratio: 0.01
+  - !ExpWarmup
+    epochs: 3
+
+OptimizerBuilder:
+  optimizer:
+    type: Momentum
+    momentum: 0.937
+    use_nesterov: True
+  regularizer:
+    factor: 0.0005
+    type: L2
+  clip_grad_by_value: 10.
