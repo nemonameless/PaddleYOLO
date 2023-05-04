@@ -13,4 +13,4 @@ arch: X
 
 
 TrainReader:
-  batch_size: 32
+  batch_size: 16

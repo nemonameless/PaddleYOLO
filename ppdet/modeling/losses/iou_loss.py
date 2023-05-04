@@ -45,23 +45,32 @@ class IouLoss(object):
                  giou=False,
                  diou=False,
                  ciou=False,
-                 loss_square=True):
+                 loss_square=True,
+                 x1y1x2y2=True,
+                 eps=1e-9,
+                 return_iou=False):
         self.loss_weight = loss_weight
         self.giou = giou
         self.diou = diou
         self.ciou = ciou
         self.loss_square = loss_square
+        self.x1y1x2y2 = x1y1x2y2
+        self.eps = eps
+        self.return_iou = return_iou
 
     def __call__(self, pbox, gbox):
         iou = bbox_iou(
-            pbox, gbox, giou=self.giou, diou=self.diou, ciou=self.ciou)
+            pbox, gbox, x1y1x2y2=self.x1y1x2y2, giou=self.giou, diou=self.diou, ciou=self.ciou, eps=self.eps)
         if self.loss_square:
             loss_iou = 1 - iou * iou
         else:
             loss_iou = 1 - iou
 
         loss_iou = loss_iou * self.loss_weight
-        return loss_iou
+        if self.return_iou:
+            return loss_iou, iou
+        else:
+            return loss_iou
 
 
 @register

@@ -2,10 +2,12 @@ export FLAGS_allocator_strategy=auto_growth
 name=n
 model_type=yolov5
 job_name=yolov5_${name}_300e_coco
+#job_name=yolov5_${name}_300e_coco_v0
 config=configs/${model_type}/${job_name}.yml
 log_dir=log_dir/${job_name}
 weight_path=/paddle/yolo/follow/new_${name}.pdparams #../efficientteacher/efficient-yolov5${name}-ssod.pdparams
-#weight_path=output/yolov5_n_300e_coco/9.pdparams #../efficientteacher/efficient-yolov5${name}-ssod.pdparams
+#weight_path=/paddle/yolo/follow/PaddleYOLO/149_25.4.pdparams # rand24  27.0  v0 26.5 but final 25.6
+#output/yolov5_n_300e_coco/9.pdparams #../efficientteacher/efficient-yolov5${name}-ssod.pdparams
 
 # 1. training
 #CUDA_VISIBLE_DEVICES=2 python3.7 tools/train.py -c ${config} --eval -r ${weight_path}

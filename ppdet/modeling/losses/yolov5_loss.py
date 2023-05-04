@@ -233,11 +233,10 @@ class YOLOv5Loss(nn.Layer):
                 else:
                     yolo_losses[k] = v
 
-        loss = 0
-        for k, v in yolo_losses.items():
-            loss += v
-
         batch_size = inputs[0].shape[0]
         num_gpus = targets.get('num_gpus', 8)
-        yolo_losses['loss'] = loss * batch_size * num_gpus
+        loss = 0
+        for k, v in yolo_losses.items():
+            loss += v * batch_size * num_gpus
+        yolo_losses['loss'] = loss
         return yolo_losses

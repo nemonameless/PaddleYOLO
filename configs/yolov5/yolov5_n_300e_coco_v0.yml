@@ -1,0 +1,60 @@
+_BASE_: [
+  '../datasets/coco_detection.yml',
+  '../runtime.yml',
+  '_base_/optimizer_300e.yml',
+  '_base_/yolov5_cspdarknet.yml',
+  '_base_/yolov5_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.25
+
+log_iter: 100
+snapshot_epoch: 10
+weights: output/yolov5_n_300e_coco/model_final
+
+
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128
+
+
+YOLOv5:
+  backbone: CSPDarkNet
+  neck: YOLOCSPPAN
+  yolo_head: YOLOv5Headv0 #
+  post_process: ~
+
+YOLOv5Headv0:
+  anchors: [[10, 13], [16, 30], [33, 23],
+            [30, 61], [62, 45], [59, 119],
+            [116, 90], [156, 198], [373, 326]]
+  anchor_masks: [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+  stride: [8, 16, 32]
+  loss: YOLOv5Loss
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 30000
+    keep_top_k: 300
+    score_threshold: 0.001
+    nms_threshold: 0.65
+
+
+input_height: &input_height 640
+input_width: &input_width 640
+input_size: &input_size [*input_height, *input_width]
+# EvalReader:
+#   sample_transforms:
+#     - Decode: {}
+#     - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
+#     - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
+#     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+#     - Permute: {}
+#   batch_size: 1
+
+EvalReader:
+  sample_transforms:
+    - Decode: {}
+    - YOLOv5KeepRatioResize: {target_size: *input_size, batch_shapes: True, size_divisor: 32, extra_pad_ratio: 0.5}
+    - LetterResize: {scale: *input_size, pad_val: 144, allow_scale_up: False}
+    - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+    - Permute: {}
+  batch_size: 1 # only support bs=1

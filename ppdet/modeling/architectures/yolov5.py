@@ -78,9 +78,10 @@ class YOLOv5(BaseArch):
             return yolo_losses
         else:
             yolo_head_outs = self.yolo_head(neck_feats)
-            post_outs = self.yolo_head.post_process(yolo_head_outs,
-                                                    self.inputs['im_shape'],
-                                                    self.inputs['scale_factor'])
+            # post_outs = self.yolo_head.post_process(yolo_head_outs,
+            #                                         self.inputs['im_shape'],
+            #                                         self.inputs['scale_factor'])
+            post_outs = self.yolo_head.post_process(yolo_head_outs, self.inputs)
 
             if not isinstance(post_outs, (tuple, list)):
                 # if set exclude_post_process, concat([pred_bboxes, pred_scores]) not scaled to origin

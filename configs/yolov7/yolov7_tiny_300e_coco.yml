@@ -14,7 +14,7 @@ act: LeakyReLU
 
 
 TrainReader:
-  batch_size: 32
+  batch_size: 16
 
 
 YOLOv7Loss:
