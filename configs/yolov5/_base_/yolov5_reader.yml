@@ -4,7 +4,7 @@ input_size: &input_size [*input_height, *input_width]
 mosaic_epoch: &mosaic_epoch 300
 
 worker_num: 4
-TrainReader1:
+TrainReader:
   sample_transforms:
     - DecodeNormResize: {target_size: *input_size, mosaic: True}
     #- DecodeNormResizeCache: {cache_root: 'dataset/coco/cache/buffer_bgr', target_size: *input_size, mosaic: True}
@@ -26,7 +26,7 @@ TrainReader1:
   mosaic_epoch: *mosaic_epoch
 
 
-TrainReader:
+TrainReader2:
   sample_transforms:
     - DecodeNormResize: {target_size: *input_size, mosaic: True}
     # - DecodeNormResizeCache: {cache_root: 'dataset/coco/cache/buffer', target_size: *input_size, mosaic: True}

@@ -89,7 +89,7 @@ class YOLOv5Loss(nn.Layer):
 
         batch_size = outputs[0].shape[0]
         gt_labels = []
-        if 0:
+        if 1:
             # collate_batch True
             for idx in range(batch_size):
                 gt_num = int(gt_nums[idx])
