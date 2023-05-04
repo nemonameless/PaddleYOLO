@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ppdet.core.workspace import register
 from ..bbox_utils import bbox_iou
+from IPython import embed
 
 __all__ = ['YOLOv7Loss']
 
@@ -103,7 +104,7 @@ class YOLOv7Loss(nn.Layer):
 
         # 2.generate targets_labels [nt, 6] from gt_targets(dict)
         anchors = anchors.numpy()
-        if 0:
+        if 1:
             # collate_batch True
             # gt_targets['gt_class'] [bs, max_gt_nums, 1]
             # gt_targets['gt_bbox'] [bs, max_gt_nums, 4]

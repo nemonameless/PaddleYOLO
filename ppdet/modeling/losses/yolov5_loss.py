@@ -75,22 +75,22 @@ class YOLOv5Loss(nn.Layer):
         self.anchor_t = anchor_t
 
     def build_targets(self, outputs, targets, anchors):
-        # targets['gt_class'] [bs, max_gt_nums, 1]
-        # targets['gt_bbox'] [bs, max_gt_nums, 4]
-        # targets['pad_gt_mask'] [bs, max_gt_nums, 1]
-        gt_nums = [len(bbox) for bbox in targets['gt_bbox']]
-        nt = int(sum(gt_nums))
-        anchors = anchors.numpy()
-        na = anchors.shape[1]  # not len(anchors)
-        tcls, tbox, indices, anch = [], [], [], []
-
-        gain = np.ones(7, dtype=np.float32)  # normalized to gridspace gain
-        ai = np.tile(np.arange(na, dtype=np.float32).reshape(na, 1), [1, nt])
-
         batch_size = outputs[0].shape[0]
         gt_labels = []
         if 1:
             # collate_batch True
+            # targets['gt_class'] [bs, max_gt_nums, 1]
+            # targets['gt_bbox'] [bs, max_gt_nums, 4]
+            # targets['pad_gt_mask'] [bs, max_gt_nums, 1]
+            gt_nums = targets['pad_gt_mask'].sum(1).squeeze(-1).numpy()
+            nt = int(sum(gt_nums))
+            anchors = anchors.numpy()
+            na = anchors.shape[1]  # not len(anchors)
+            tcls, tbox, indices, anch = [], [], [], []
+
+            gain = np.ones(7, dtype=np.float32)  # normalized to gridspace gain
+            ai = np.tile(np.arange(na, dtype=np.float32).reshape(na, 1), [1, nt])
+
             for idx in range(batch_size):
                 gt_num = int(gt_nums[idx])
                 if gt_num == 0:
@@ -100,6 +100,15 @@ class YOLOv5Loss(nn.Layer):
                 img_idx = np.repeat(np.array([[idx]]), gt_num, axis=0)
                 gt_labels.append(np.concatenate((img_idx, gt_class, gt_bbox), -1))
         else:
+            gt_nums = [len(bbox) for bbox in targets['gt_bbox']]
+            nt = int(sum(gt_nums))
+            anchors = anchors.numpy()
+            na = anchors.shape[1]  # not len(anchors)
+            tcls, tbox, indices, anch = [], [], [], []
+
+            gain = np.ones(7, dtype=np.float32)  # normalized to gridspace gain
+            ai = np.tile(np.arange(na, dtype=np.float32).reshape(na, 1), [1, nt])
+
             for idx in range(batch_size):
                 gt_num = gt_nums[idx]
                 if gt_num == 0:
