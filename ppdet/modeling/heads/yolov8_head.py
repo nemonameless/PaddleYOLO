@@ -114,13 +114,13 @@ class YOLOv8Head(nn.Layer):
                 ]))
         # projection
         self.proj = paddle.arange(self.reg_max).astype('float32')
-        self._init_bias()
+        self._initialize_biases()
 
     @classmethod
     def from_config(cls, cfg, input_shape):
         return {'in_channels': [i.channels for i in input_shape], }
 
-    def _init_bias(self):
+    def _initialize_biases(self):
         for a, b, s in zip(self.conv_reg, self.conv_cls, self.fpn_strides):
             constant_(a[-1].weight)
             constant_(a[-1].bias, 1.0)

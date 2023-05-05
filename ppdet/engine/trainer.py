@@ -92,6 +92,7 @@ class Trainer(object):
 
         if self.cfg.architecture in ['YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8']:
             reset_initialized_parameter(self.model)
+            self.model.yolo_head._initialize_biases() # Note: must added
 
         if cfg.architecture in [
                 'YOLOX', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
