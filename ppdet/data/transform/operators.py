@@ -172,7 +172,8 @@ class MosaicPerspective(BaseOperator):
                  translate=0.1,
                  scale=0.5,
                  shear=0.0,
-                 perspective=0.0):
+                 perspective=0.0,
+                 boxes_normed=True):
         super(MosaicPerspective, self).__init__()
         self.mosaic_prob = mosaic_prob
         self.mixup_prob = mixup_prob
@@ -189,6 +190,7 @@ class MosaicPerspective(BaseOperator):
         self.scale = scale
         self.shear = shear
         self.perspective = perspective
+        self.boxes_normed = boxes_normed
 
     def xywhn2xyxy(self, x, w=640, h=640, padw=0, padh=0):
         # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
@@ -384,6 +386,11 @@ class MosaicPerspective(BaseOperator):
     def __call__(self, sample, context=None):
         # current sample and other 3 samples to a new sample
         if not isinstance(sample, Sequence):
+            if self.boxes_normed:
+                h, w, c = sample['image'].shape
+                sample['gt_bbox'] = self.xywhn2xyxy(sample['gt_bbox'], w, h)
+            sample['image'], sample['gt_bbox'] = self.letterbox_resize(
+                sample['image'], sample['gt_bbox'], self.target_size)
             return sample
         # assert len(sample) == 5 or len(
         #     sample) == 10, 'YOLOv5 Mosaic need 4 or 9 samples and 1 for mixup'
@@ -391,6 +398,9 @@ class MosaicPerspective(BaseOperator):
         # 0.no mosaic
         if random.random() >= self.mosaic_prob:
             sample0 = sample[0]
+            if self.boxes_normed:
+                h, w, c = sample0['image'].shape
+                sample0['gt_bbox'] = self.xywhn2xyxy(sample0['gt_bbox'], w, h)
             sample0['image'], sample0['gt_bbox'] = self.letterbox_resize(
                 sample0['image'], sample0['gt_bbox'], self.target_size)
             return sample0
@@ -4512,8 +4522,8 @@ class YOLOv5KeepRatioResize(BaseOperator):
 
     def apply_image(self, image):
         original_h, original_w = image.shape[:2]
-        ratio = self._get_rescale_ratio(
-            (original_h, original_w), self.target_size)
+        ratio = self._get_rescale_ratio((original_h, original_w),
+                                        self.target_size)
         if ratio != 1:
             # resize image according to the shape
             # NOTE: We are currently testing on COCO that modifying
@@ -4548,8 +4558,8 @@ class YOLOv5KeepRatioResize(BaseOperator):
 
         shapes = [[1, 1]]
         aspect_ratio = resize_h / resize_w
-        shapes = [aspect_ratio, 1
-                  ] if aspect_ratio < 1 else [1, 1 / aspect_ratio]
+        shapes = [aspect_ratio,
+                  1] if aspect_ratio < 1 else [1, 1 / aspect_ratio]
         batch_shapes = np.ceil(
             np.array(shapes) * 640 / self.size_divisor +
             self.extra_pad_ratio).astype(np.int64) * self.size_divisor

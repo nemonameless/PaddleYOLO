@@ -6,7 +6,7 @@ mosaic_epoch: &mosaic_epoch 300
 worker_num: 4
 TrainReader:
   sample_transforms:
-    - Decode: {}
+    - DecodeNormResize: {target_size: *input_size, mosaic: True}
     - MosaicPerspective:
         mosaic_prob: 1.0
         target_size: *input_size
