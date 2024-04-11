@@ -208,7 +208,18 @@ class MosaicPerspective(BaseOperator):
                   for x in self.mosaic_border)
         gt_bboxes = [x['gt_bbox'] for x in sample]
         for i in range(len(sample)):
-            im = sample[i]['image']
+            ori_im = sample[i]['image']
+            h0, w0 = ori_im.shape[:2]
+            # get resized img
+            scale = min(1. * s / h0, 1. * s / w0)
+            if scale != 1:  # if sizes are not equal
+                im = cv2.resize(
+                    ori_im, (int(w0 * scale), int(h0 * scale)),
+                    interpolation=cv2.INTER_LINEAR
+                    if scale > 1 else cv2.INTER_AREA).astype(np.uint8)
+            else:
+                im = ori_im
+
             h, w, c = im.shape
             # x1a, y1a, x2a, y2a: large image
             # x1b, y1b, x2b, y2b: small image
@@ -235,7 +246,13 @@ class MosaicPerspective(BaseOperator):
             image[y1a:y2a, x1a:x2a] = im[y1b:y2b, x1b:x2b]
             padw = x1a - x1b
             padh = y1a - y1b
-            gt_bboxes[i] = self.xywhn2xyxy(gt_bboxes[i], w, h, padw, padh)
+            if self.boxes_normed:
+                gt_bboxes[i] = self.xywhn2xyxy(gt_bboxes[i], w, h, padw, padh)
+            else:
+                gt_bboxes[i][:, 0] = scale * gt_bboxes[i][:, 0] + padw
+                gt_bboxes[i][:, 1] = scale * gt_bboxes[i][:, 1] + padh
+                gt_bboxes[i][:, 2] = scale * gt_bboxes[i][:, 2] + padw
+                gt_bboxes[i][:, 3] = scale * gt_bboxes[i][:, 3] + padh
 
         gt_bboxes = np.concatenate(gt_bboxes, axis=0)
         gt_bboxes = np.clip(gt_bboxes, 0, s * 2)
@@ -405,7 +422,7 @@ class MosaicPerspective(BaseOperator):
                 sample0['image'], sample0['gt_bbox'], self.target_size)
             return sample0
 
-        random.shuffle(sample)
+        random.shuffle(sample)  # shuffle sample
 
         # 1._mosaic_preprocess
         mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self._mosaic4_preprocess(

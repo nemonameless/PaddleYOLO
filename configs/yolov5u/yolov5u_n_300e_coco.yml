@@ -8,7 +8,7 @@ _BASE_: [
 depth_mult: 0.33
 width_mult: 0.25
 
-log_iter: 100
+log_iter: 50
 snapshot_epoch: 10
 weights: output/yolov5u_n_300e_coco/model_final
 

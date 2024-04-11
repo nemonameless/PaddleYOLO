@@ -7,7 +7,7 @@ LearningRate:
     max_epochs: 300
     min_lr_ratio: 0.01
   - !ExpWarmup
-    epochs: 3
+    epochs: 5 #3
 
 OptimizerBuilder:
   optimizer:
@@ -15,5 +15,5 @@ OptimizerBuilder:
     momentum: 0.937
     use_nesterov: True
   regularizer:
-    factor: 0.001
+    factor: 0.001 # 0.0005 in yolov8
     type: L2
