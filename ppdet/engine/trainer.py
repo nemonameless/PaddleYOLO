@@ -96,6 +96,9 @@ class Trainer(object):
         if self.cfg.architecture in ['YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8']:
             reset_initialized_parameter(self.model)
             # self.model.yolo_head._initialize_biases()
+            if self.model.yolo_head.__class__.__name__ == 'YOLOv5Head':
+                print(self.model.yolo_head.__class__.__name__, "_initialize_biases!!!")
+                self.model.yolo_head._initialize_biases()
 
         if cfg.architecture in [
                 'YOLOX', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
@@ -322,7 +325,13 @@ class Trainer(object):
             (self.cfg.use_gpu or self.cfg.use_npu or self.cfg.use_mlu) and
             self._nranks > 1)
         if sync_bn:
-            model = paddle.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            naive_sync_bn = getattr(self.cfg, 'naive_sync_bn', None)
+            if naive_sync_bn or self.cfg.use_npu:
+                print('Use NaiveSyncBatchNorm!!!!!!!!')
+                from .naive_syncbn import NaiveSyncBatchNorm
+                model = NaiveSyncBatchNorm.convert_sync_batchnorm(model)
+            else:
+                model = paddle.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
         # enabel auto mixed precision mode
         if self.use_amp:
