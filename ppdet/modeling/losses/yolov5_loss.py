@@ -119,8 +119,8 @@ class YOLOv5Loss(nn.Layer):
                 gt_num = gt_nums[idx]
                 if gt_num == 0:
                     continue
-                gt_bbox = targets['gt_bbox'][idx][:gt_num]
-                gt_class = targets['gt_class'][idx][:gt_num] * 1.0
+                gt_bbox = targets['gt_bbox'][idx][:gt_num].numpy()
+                gt_class = targets['gt_class'][idx][:gt_num].numpy() * 1.0
                 img_idx = np.repeat(np.array([[idx]]), gt_num, axis=0)
                 gt_labels.append(
                     np.concatenate((img_idx, gt_class, gt_bbox), -1))
