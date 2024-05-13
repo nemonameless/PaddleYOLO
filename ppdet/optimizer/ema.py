@@ -97,27 +97,28 @@ class ModelEMA(object):
         self.step = step
 
     def update(self, model=None):
-        if self.ema_decay_type == 'threshold':
-            decay = min(self.decay, (1 + self.step) / (10 + self.step))
-        elif self.ema_decay_type == 'exponential':
-            decay = self.decay * (1 - math.exp(-(self.step + 1) / 2000))
-        else:
-            decay = self.decay
-        self._decay = decay
+        with paddle.base.dygraph.no_grad():
+            if self.ema_decay_type == 'threshold':
+                decay = min(self.decay, (1 + self.step) / (10 + self.step))
+            elif self.ema_decay_type == 'exponential':
+                decay = self.decay * (1 - math.exp(-(self.step + 1) / 2000))
+            else:
+                decay = self.decay
+            self._decay = decay
 
-        if model is not None:
-            model_dict = model.state_dict()
-        else:
-            model_dict = {k: p() for k, p in self._model_state.items()}
-            assert all(
-                [v is not None for _, v in model_dict.items()]), 'python gc.'
+            if model is not None:
+                model_dict = model.state_dict()
+            else:
+                model_dict = {k: p() for k, p in self._model_state.items()}
+                assert all(
+                    [v is not None for _, v in model_dict.items()]), 'python gc.'
 
-        for k, v in self.state_dict.items():
-            if k not in self.ema_black_list:
-                v = decay * v + (1 - decay) * model_dict[k]
-                v.stop_gradient = True
-                self.state_dict[k] = v
-        self.step += 1
+            for k, v in self.state_dict.items():
+                if k not in self.ema_black_list:
+                    v = decay * v + (1 - decay) * model_dict[k]
+                    v.stop_gradient = True
+                    self.state_dict[k] = v
+            self.step += 1
 
     def apply(self):
         if self.step == 0:

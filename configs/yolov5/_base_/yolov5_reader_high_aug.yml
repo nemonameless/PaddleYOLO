@@ -18,7 +18,7 @@ TrainReader:
   batch_size: 8
   shuffle: True
   drop_last: False
-  use_shared_memory: False
+  use_shared_memory: True
   collate_batch: False
   mosaic_epoch: *mosaic_epoch
 
