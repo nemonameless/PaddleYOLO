@@ -430,16 +430,13 @@ def bbox_iou(box1,
     x2 = paddle.minimum(px2, gx2)
     y2 = paddle.minimum(py2, gy2)
 
-    # overlap = ((x2 - x1).clip(0)) * ((y2 - y1).clip(0))
-    overlap = ((x2 - x1).clip(0, 1e25)) * ((y2 - y1).clip(0, 1e25))
+    overlap = ((x2 - x1).clip(0)) * ((y2 - y1).clip(0))
 
     area1 = (px2 - px1) * (py2 - py1)
-    # area1 = area1.clip(0)
-    area1 = area1.clip(0, 1e25)
+    area1 = area1.clip(0)
 
     area2 = (gx2 - gx1) * (gy2 - gy1)
-    # area2 = area2.clip(0)
-    area2 = area2.clip(0, 1e25)
+    area2 = area2.clip(0)
 
     union = area1 + area2 - overlap + eps
     iou = overlap / union
