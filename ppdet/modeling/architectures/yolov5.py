@@ -18,7 +18,6 @@ from __future__ import print_function
 
 from ppdet.core.workspace import register, create
 from .meta_arch import BaseArch
-from ..heads import YOLOv5Head_rect, YOLOv8Head_rect
 
 __all__ = ['YOLOv5']
 
@@ -79,12 +78,9 @@ class YOLOv5(BaseArch):
             return yolo_losses
         else:
             yolo_head_outs = self.yolo_head(neck_feats)
-            if isinstance(self.yolo_head, (YOLOv5Head_rect, YOLOv8Head_rect)):
-                post_outs = self.yolo_head.post_process(yolo_head_outs, self.inputs)
-            else:
-                post_outs = self.yolo_head.post_process(yolo_head_outs,
-                                                        self.inputs['im_shape'],
-                                                        self.inputs['scale_factor'])
+            post_outs = self.yolo_head.post_process(yolo_head_outs,
+                                                    self.inputs['im_shape'],
+                                                    self.inputs['scale_factor'])
 
             if not isinstance(post_outs, (tuple, list)):
                 # if set exclude_post_process, concat([pred_bboxes, pred_scores]) not scaled to origin
