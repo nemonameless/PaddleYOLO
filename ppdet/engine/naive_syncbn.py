@@ -35,10 +35,7 @@ def differentiable_all_reduce(input):
 
 class NaiveSyncBatchNorm(nn.layer.norm.BatchNorm2D):
     """
-    In PyTorch<=1.5, ``nn.SyncBatchNorm`` has incorrect gradient
-    when the batch size on each worker is different.
-    (e.g., when scale augmentation is used, or when it is applied to mask head).
-
+    NPU SyncBatchNorm.
     This is a slower but correct alternative to `nn.SyncBatchNorm`.
 
     Note:
