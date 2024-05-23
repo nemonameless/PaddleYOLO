@@ -7,7 +7,7 @@ LearningRate:
     max_epochs: 500
     min_lr_ratio: 0.01
   - !ExpWarmup
-    epochs: 3
+    epochs: 5 #3
 
 OptimizerBuilder:
   optimizer:

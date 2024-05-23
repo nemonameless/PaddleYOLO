@@ -6,8 +6,8 @@ mosaic_epoch: &mosaic_epoch 490 # last 10 epochs close mosaic, totally 500 epoch
 worker_num: 4
 TrainReader:
   sample_transforms:
-    - DecodeNormResize: {target_size: *input_size, mosaic: True}
-    - MosaicPerspective: {mosaic_prob: 1.0, target_size: *input_size, scale: 0.9, mixup_prob: 0.1, copy_paste_prob: 0.1}
+    - Decode: {}
+    - MosaicPerspective: {mosaic_prob: 1.0, boxes_normed: False, target_size: *input_size, scale: 0.9, mixup_prob: 0.1, copy_paste_prob: 0.1}
     - RandomHSV: {hgain: 0.015, sgain: 0.7, vgain: 0.4}
     - RandomFlip: {}
   batch_transforms:
@@ -29,7 +29,7 @@ EvalReader:
     - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 8
+  batch_size: 1
 
 
 TestReader:

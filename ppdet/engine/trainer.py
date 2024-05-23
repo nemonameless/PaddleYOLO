@@ -95,7 +95,8 @@ class Trainer(object):
 
         if self.cfg.architecture in ['YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8']:
             reset_initialized_parameter(self.model)
-            self.model.yolo_head._initialize_biases()  # Note: must added
+            if self.model.yolo_head.__class__.__name__ == 'YOLOv5Head':
+                self.model.yolo_head._initialize_biases()
 
         if cfg.architecture in [
                 'YOLOX', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
@@ -317,16 +318,25 @@ class Trainer(object):
             model = apply_to_static(self.cfg, model)
             if self.cfg.architecture == 'YOLOv5':
                 model.yolo_head.loss.to_static = True
-        sync_bn = (getattr(self.cfg, 'norm_type', None) == 'sync_bn' and
-                   (self.cfg.use_gpu or self.cfg.use_mlu) and self._nranks > 1)
+        sync_bn = (
+            getattr(self.cfg, 'norm_type', None) == 'sync_bn' and
+            (self.cfg.use_gpu or self.cfg.use_npu or self.cfg.use_mlu) and
+            self._nranks > 1)
         if sync_bn:
-            model = paddle.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            if self.cfg.use_npu:
+                logger.info('Use NaiveSyncBatchNorm for NPU!')
+                from .naive_syncbn import NaiveSyncBatchNorm
+                model = NaiveSyncBatchNorm.convert_sync_batchnorm(model)
+            else:
+                model = paddle.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
         # enabel auto mixed precision mode
         if self.use_amp:
             scaler = paddle.amp.GradScaler(
                 enable=self.cfg.use_gpu or self.cfg.use_npu or self.cfg.use_mlu,
                 init_loss_scaling=self.cfg.get('init_loss_scaling', 1024))
+        else:
+            scaler = paddle.amp.GradScaler(enable=False)
 
         # get distributed model
         if self.cfg.get('fleet', False):
