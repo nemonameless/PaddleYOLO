@@ -3,7 +3,7 @@ input_width: &input_width 640
 input_size: &input_size [*input_height, *input_width]
 mosaic_epoch: &mosaic_epoch 290 # last 10 epochs close mosaic, totally 300 epochs as default
 
-worker_num: 4
+worker_num: 8
 TrainReader:
   sample_transforms:
     - DecodeNormResize: {target_size: *input_size, mosaic: True}
