@@ -379,7 +379,7 @@ class Trainer(object):
             model.train()
             iter_tic = time.time()
             for step_id, data in enumerate(self.loader):
-                if self.cfg.architecture =='YOLOv5':
+                if self.cfg.architecture =='YOLOv5' and self.cfg.use_gpu:
                     data["image"] = data["image"].cuda(blocking=False)
                 if self.cfg.architecture in [
                         'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
