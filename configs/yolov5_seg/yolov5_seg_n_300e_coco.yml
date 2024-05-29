@@ -1,0 +1,13 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  '_base_/optimizer_300e.yml',
+  '_base_/yolov5_seg_cspdarknet.yml',
+  '_base_/yolov5_seg_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.25
+
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov5_seg_n_300e_coco/model_final

@@ -1,0 +1,37 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  '_base_/optimizer_300e.yml',
+  '_base_/yolov6_seg_efficientrep.yml',
+  '_base_/yolov6_seg_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.25
+log_iter: 20
+snapshot_epoch: 10
+weights: output/yolov6_seg_n_300e_coco/model_final
+
+
+### reader config
+TrainReader:
+  batch_size: 8 # default 8 gpus, total bs = 64
+
+EvalReader:
+  batch_size: 1
+
+
+### model config
+act: 'relu'
+training_mode: "repvgg"
+
+YOLOv6:
+  backbone: EfficientRep
+  neck: RepBiFPAN
+  yolo_head: EffiDeInsHead
+  post_process: ~
+
+EffiDeInsHead:
+  reg_max: 0
+  use_dfl: False # False in n/s
+  loss_weight: {cls: 1.0, iou: 2.5}
+  iou_type: 'siou' # only in n version

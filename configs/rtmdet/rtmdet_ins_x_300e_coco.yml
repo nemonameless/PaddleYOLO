@@ -1,0 +1,13 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  './_base_/optimizer_300e.yml',
+  './_base_/rtmdet_ins_cspnext.yml',
+  './_base_/rtmdet_reader.yml',
+]
+depth_mult: 1.33
+width_mult: 1.25
+
+log_iter: 100
+snapshot_epoch: 10
+weights: output/rtmnet_ins_x_300e_coco/model_final

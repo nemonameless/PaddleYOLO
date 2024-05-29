@@ -1,0 +1,44 @@
+architecture: YOLOv8
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9999
+ema_decay_type: "exponential"
+act: silu
+find_unused_parameters: True
+
+with_mask: True
+
+depth_mult: 1.0 # default: L version
+width_mult: 1.0
+
+YOLOv8:
+  backbone: YOLOv8CSPDarkNet
+  neck: YOLOv8CSPPAN
+  yolo_head: YOLOv8InsHead
+  with_mask: True
+  post_process: ~
+
+YOLOv8CSPDarkNet:
+  arch: 'P5'
+  return_idx: [2, 3, 4]
+  last_stage_ch: 1024
+  last2_stage_ch: 512
+
+# use default config
+# YOLOv8CSPPAN:
+
+YOLOv8InsHead:
+  fpn_strides: [8, 16, 32]
+  loss_weight: {class: 0.5, iou: 7.5, dfl: 1.5}
+  assigner:
+    name: TaskAlignedAssigner
+    topk: 10
+    alpha: 0.5
+    beta: 6.0
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 3000
+    keep_top_k: 300
+    score_threshold: 0.001
+    nms_threshold: 0.7
+    return_index: True

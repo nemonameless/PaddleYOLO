@@ -7,7 +7,8 @@
 - [引用](#引用)
 
 ## 模型库
-### RTMDet on COCO
+
+### 基础检测模型
 
 | 网络网络        | 输入尺寸   | 图片数/GPU | 学习率策略 | 模型推理耗时(ms) |   mAP  |   AP50  | Params(M) | FLOPs(G) |  下载链接       | 配置文件 |
 | :------------- | :------- | :-------: | :------: | :---------: | :-----: |:-----: | :-----: |:-----: | :-------------: | :-----: |
@@ -17,6 +18,15 @@
 | *RTMDet-l       |  640     |    32      |   300e    |    10.2  |  51.2 | 68.8 |  52.31  | 160.32 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_l_300e_coco.pdparams) | [配置文件](./rtmdet_l_300e_coco.yml) |
 | *RTMDet-x       |  640     |    32      |   300e    |    18.0  |  52.6 | 70.4 |  94.86  | 283.12 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_x_300e_coco.pdparams) | [配置文件](./rtmdet_x_300e_coco.yml) |
 
+### 实例分割模型
+
+| 网络网络        | 输入尺寸   | 图片数/GPU | 学习率策略 | 模型推理耗时(ms) |  box AP  |  mask AP  | Params(M) | FLOPs(G) |  下载链接       | 配置文件 |
+| :------------- | :------- | :-------: | :------: | :---------: | :-----: |:-----: | :-----: |:-----: | :-------------: | :-----: |
+| *RTMDet-t       |  640     |    32      |   300e    |    -   |  40.5 | - |  5.6  | 11.8 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_ins_t_300e_coco.pdparams) | [配置文件](./rtmdet_ins_t_300e_coco.yml) |
+| *RTMDet-s       |  640     |    32      |   300e    |    -   |  44.0 | - |  10.18  | 21.5 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_ins_s_300e_coco.pdparams) | [配置文件](./rtmdet_ins_s_300e_coco.yml) |
+| *RTMDet-m       |  640     |    32      |   300e    |    -   |  48.8 | - |  27.58  | 54.13 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_ins_m_300e_coco.pdparams) | [配置文件](./rtmdet_ins_m_300e_coco.yml) |
+| *RTMDet-l       |  640     |    32      |   300e    |    -  |  51.2 | - |  57.37  | 106.56 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_ins_l_300e_coco.pdparams) | [配置文件](./rtmdet_ins_l_300e_coco.yml) |
+| *RTMDet-x       |  640     |    32      |   300e    |    -  |  52.4 | - |  102.7  | 182.7 |[下载链接](https://paddledet.bj.bcebos.com/models/rtmdet_ins_x_300e_coco.pdparams) | [配置文件](./rtmdet_ins_x_300e_coco.yml) |
 
 **注意:**
   - RTMDet模型暂未支持完全训练，mAP为部署权重在COCO val2017上的`mAP(IoU=0.5:0.95)`结果，且评估未使用`multi_label`等trick；

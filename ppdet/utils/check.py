@@ -27,8 +27,10 @@ logger = setup_logger(__name__)
 
 __all__ = [
     'check_gpu', 'check_npu', 'check_xpu', 'check_mlu', 'check_version',
-    'check_config'
+    'check_config', "_IS_NPU"
 ]
+
+_IS_NPU = "npu" in paddle.device.get_all_custom_device_type()
 
 
 def check_mlu(use_mlu):

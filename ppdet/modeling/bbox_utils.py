@@ -618,3 +618,7 @@ def iou_similarity(box1, box2, eps=1e-10):
     area2 = (gx2y2 - gx1y1).clip(0).prod(-1)
     union = area1 + area2 - overlap + eps
     return overlap / union
+
+
+def custom_ceil(x):
+    return int(x + 0.5) if x > 0 else int(x - 0.5)

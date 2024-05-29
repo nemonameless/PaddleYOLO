@@ -1,0 +1,43 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  '_base_/optimizer_300e.yml',
+  '_base_/yolov6_seg_cspbep.yml',
+  '_base_/yolov6_seg_reader_high_aug.yml',
+]
+depth_mult: 1.33
+width_mult: 1.25
+log_iter: 20
+snapshot_epoch: 10
+weights: output/yolov6_seg_x_300e_coco/model_final
+
+
+### reader config
+TrainReader:
+  batch_size: 8 # default 8 gpus, total bs = 64
+
+EvalReader:
+  batch_size: 1
+
+
+### model config
+act: 'silu'
+training_mode: "conv_silu_nobias" # Note: X use silu, seg use conv_silu_nobias
+
+YOLOv6:
+  backbone: CSPBepBackbone
+  neck: CSPRepBiFPAN
+  yolo_head: EffiDeInsHead
+  post_process: ~
+
+CSPBepBackbone:
+  csp_e: 0.50
+
+CSPRepBiFPAN:
+  csp_e: 0.50
+
+EffiDeInsHead:
+  reg_max: 16
+  use_dfl: True
+  iou_type: 'giou'
+  loss_weight: {cls: 1.0, iou: 2.5, dfl: 0.5}

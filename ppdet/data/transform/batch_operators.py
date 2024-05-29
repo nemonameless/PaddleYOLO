@@ -37,6 +37,7 @@ __all__ = [
     'BatchRandomResize',
     'Gt2YoloTarget',
     'PadGT',
+    'PadMaskBatch',
 ]
 
 
@@ -436,4 +437,72 @@ class PadGT(BaseOperator):
                 if num_gt > 0:
                     pad_gt_areas[:num_gt, 0] = sample['gt_areas']
                 sample['gt_areas'] = pad_gt_areas
+            if 'gt_segm' in sample:
+                mask_h, mask_w = sample['gt_segm'].shape[-2:]
+                pad_gt_segm = np.zeros(
+                    (num_max_boxes, mask_h, mask_w), dtype=np.float32)
+                if num_gt > 0:
+                    pad_gt_segm[:num_gt] = sample['gt_segm']
+                sample['gt_segm'] = pad_gt_segm
+        return samples
+
+
+@register_op
+class PadMaskBatch(BaseOperator):
+    """
+    Pad a batch of samples so that they can be divisible by a stride.
+    The layout of each image should be 'CHW'.
+    Args:
+        pad_to_stride (int): If `pad_to_stride > 0`, pad zeros to ensure
+            height and width is divisible by `pad_to_stride`.
+        return_pad_mask (bool): If `return_pad_mask = True`, return
+            `pad_mask` for transformer.
+    """
+
+    def __init__(self, pad_to_stride=0, return_pad_mask=True):
+        super(PadMaskBatch, self).__init__()
+        self.pad_to_stride = pad_to_stride
+        self.return_pad_mask = return_pad_mask
+
+    def __call__(self, samples, context=None):
+        """
+        Args:
+            samples (list): a batch of sample, each is dict.
+        """
+        coarsest_stride = self.pad_to_stride
+
+        max_shape = np.array([data['image'].shape for data in samples]).max(
+            axis=0)
+        if coarsest_stride > 0:
+            max_shape[1] = int(
+                np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
+            max_shape[2] = int(
+                np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
+
+        for data in samples:
+            im = data['image']
+            im_c, im_h, im_w = im.shape[:]
+            padding_im = np.zeros(
+                (im_c, max_shape[1], max_shape[2]), dtype=np.float32)
+            padding_im[:, :im_h, :im_w] = im.astype(np.float32)
+            data['image'] = padding_im
+            if 'semantic' in data and data['semantic'] is not None:
+                semantic = data['semantic']
+                padding_sem = np.zeros(
+                    (1, max_shape[1], max_shape[2]), dtype=np.float32)
+                padding_sem[:, :im_h, :im_w] = semantic
+                data['semantic'] = padding_sem
+            if 'gt_segm' in data and data['gt_segm'] is not None:
+                gt_segm = data['gt_segm']
+                padding_segm = np.zeros(
+                    (gt_segm.shape[0], max_shape[1], max_shape[2]),
+                    dtype=np.uint8)
+                padding_segm[:, :im_h, :im_w] = gt_segm
+                data['gt_segm'] = padding_segm
+            if self.return_pad_mask:
+                padding_mask = np.zeros(
+                    (max_shape[1], max_shape[2]), dtype=np.float32)
+                padding_mask[:im_h, :im_w] = 1.
+                data['pad_mask'] = padding_mask
+
         return samples

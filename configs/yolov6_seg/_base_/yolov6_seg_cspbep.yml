@@ -1,0 +1,55 @@
+architecture: YOLOv6
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9999
+ema_decay_type: "exponential"
+find_unused_parameters: True
+
+with_mask: True
+
+act: 'relu' # 'silu' in L model
+training_mode: "repvgg"
+
+depth_mult: 1.0 # default: L model
+width_mult: 1.0
+
+YOLOv6:
+  backbone: CSPBepBackbone
+  neck: CSPRepBiFPAN
+  yolo_head: EffiDeInsHead
+  post_process: ~
+
+CSPBepBackbone:
+  arch: 'P5'
+  return_idx: [2, 3, 4]
+  csp_e: 0.5
+  fuse_P2: True # add P2 and return 4 layers
+  cspsppf: False
+
+CSPRepBiFPAN:
+  csp_e: 0.5
+
+EffiDeInsHead:
+  fpn_strides: [8, 16, 32]
+  grid_cell_scale: 5.0
+  grid_cell_offset: 0.5
+  reg_max: 16
+  use_dfl: True # in m/l version
+  static_assigner_epoch: 0 # warmup_epoch
+  loss_weight: {cls: 1.0, iou: 2.5, dfl: 0.5}
+  iou_type: 'giou'  # 'siou' in n version, 'giou' in s/m/l/x version
+  static_assigner:
+    name: ATSSAssigner
+    topk: 9
+  assigner:
+    name: TaskAlignedAssigner
+    topk: 13
+    alpha: 1.0
+    beta: 6.0
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 3000
+    keep_top_k: 300
+    score_threshold: 0.03
+    nms_threshold: 0.65
+    return_index: True

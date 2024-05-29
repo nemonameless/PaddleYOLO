@@ -1,0 +1,51 @@
+architecture: YOLOv5
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9999
+ema_decay_type: "exponential"
+act: silu
+find_unused_parameters: True
+
+with_mask: True
+
+depth_mult: 1.0
+width_mult: 1.0
+
+
+YOLOv5:
+  backbone: CSPDarkNet
+  neck: YOLOCSPPAN
+  yolo_head: YOLOv5InsHead
+  with_mask: True
+  post_process: ~
+
+CSPDarkNet:
+  arch: "P5"
+  return_idx: [2, 3, 4]
+  depthwise: false
+
+YOLOCSPPAN:
+  depthwise: false
+
+YOLOv5InsHead:
+  anchors: [[10, 13], [16, 30], [33, 23],
+            [30, 61], [62, 45], [59, 119],
+            [116, 90], [156, 198], [373, 326]]
+  anchor_masks: [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+  stride: [8, 16, 32]
+  loss: YOLOv5InsLoss
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 3000
+    keep_top_k: 300
+    score_threshold: 0.001
+    nms_threshold: 0.65
+    return_index: True
+
+YOLOv5InsLoss:
+  downsample_ratios: [8, 16, 32]
+  balance: [4.0, 1.0, 0.4]
+  overlap: True
+  box_weight: 0.05
+  obj_weight: 1.0
+  cls_weght: 0.5

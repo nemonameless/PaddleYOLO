@@ -1,0 +1,20 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  '_base_/optimizer_500e.yml',
+  '_base_/yolov8_seg_cspdarknet.yml',
+  '_base_/yolov8_seg_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.50
+
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov8_seg_s_500e_coco/model_final
+
+
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128
+
+EvalReader:
+  batch_size: 1

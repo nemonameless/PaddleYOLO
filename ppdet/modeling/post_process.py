@@ -19,7 +19,7 @@ from ppdet.core.workspace import register
 from ppdet.modeling.bbox_utils import nonempty_bbox
 from .transformers import bbox_cxcywh_to_xyxy
 
-__all__ = ['BBoxPostProcess', 'DETRPostProcess']
+__all__ = ['BBoxPostProcess', 'MaskPostProcess', 'DETRPostProcess']
 
 
 @register
@@ -304,6 +304,104 @@ class DETRPostProcess(object):
             self.num_top_queries, dtype='int32').tile([bbox_pred.shape[0]])
         bbox_pred = bbox_pred.reshape([-1, 6])
         return bbox_pred, bbox_num, mask_pred
+
+
+@register
+class MaskPostProcess(object):
+    __shared__ = ['export_onnx', 'assign_on_cpu']
+    """
+    refer to:
+    https://github.com/facebookresearch/detectron2/layers/mask_ops.py
+
+    Get Mask output according to the output from model
+    """
+
+    def __init__(self,
+                 binary_thresh=0.5,
+                 export_onnx=False,
+                 assign_on_cpu=False):
+        super(MaskPostProcess, self).__init__()
+        self.binary_thresh = binary_thresh
+        self.export_onnx = export_onnx
+        self.assign_on_cpu = assign_on_cpu
+
+    def __call__(self, mask_out, bboxes, bbox_num, origin_shape):
+        """
+        Decode the mask_out and paste the mask to the origin image.
+
+        Args:
+            mask_out (Tensor): mask_head output with shape [N, 28, 28].
+            bbox_pred (Tensor): The output bboxes with shape [N, 6] after decode
+                and NMS, including labels, scores and bboxes.
+            bbox_num (Tensor): The number of prediction boxes of each batch with
+                shape [1], and is N.
+            origin_shape (Tensor): The origin shape of the input image, the tensor
+                shape is [N, 2], and each row is [h, w].
+        Returns:
+            pred_result (Tensor): The final prediction mask results with shape
+                [N, h, w] in binary mask style.
+        """
+        num_mask = mask_out.shape[0]
+        origin_shape = paddle.cast(origin_shape, 'int32')
+        device = paddle.device.get_device()
+
+        if self.export_onnx:
+            h, w = origin_shape[0][0], origin_shape[0][1]
+            mask_onnx = paste_mask(mask_out[:, None, :, :], bboxes[:, 2:], h, w,
+                                   self.assign_on_cpu)
+            mask_onnx = mask_onnx >= self.binary_thresh
+            pred_result = paddle.cast(mask_onnx, 'int32')
+
+        else:
+            max_h = paddle.max(origin_shape[:, 0])
+            max_w = paddle.max(origin_shape[:, 1])
+            pred_result = paddle.zeros(
+                [num_mask, max_h, max_w], dtype='int32') - 1
+
+            id_start = 0
+            for i in range(paddle.shape(bbox_num)[0]):
+                bboxes_i = bboxes[id_start:id_start + bbox_num[i], :]
+                mask_out_i = mask_out[id_start:id_start + bbox_num[i], :, :]
+                im_h = origin_shape[i, 0]
+                im_w = origin_shape[i, 1]
+                pred_mask = paste_mask(mask_out_i[:, None, :, :],
+                                       bboxes_i[:, 2:], im_h, im_w,
+                                       self.assign_on_cpu)
+                pred_mask = paddle.cast(pred_mask >= self.binary_thresh,
+                                        'int32')
+                pred_result[id_start:id_start + bbox_num[i], :im_h, :
+                            im_w] = pred_mask
+                id_start += bbox_num[i]
+        if self.assign_on_cpu:
+            paddle.set_device(device)
+
+        return pred_result
+
+
+def paste_mask(masks, boxes, im_h, im_w, assign_on_cpu=False):
+    """
+    Paste the mask prediction to the original image.
+    """
+    x0_int, y0_int = 0, 0
+    x1_int, y1_int = im_w, im_h
+    x0, y0, x1, y1 = paddle.split(boxes, 4, axis=1)
+    N = masks.shape[0]
+    img_y = paddle.arange(y0_int, y1_int) + 0.5
+    img_x = paddle.arange(x0_int, x1_int) + 0.5
+
+    img_y = (img_y - y0) / (y1 - y0) * 2 - 1
+    img_x = (img_x - x0) / (x1 - x0) * 2 - 1
+    # img_x, img_y have shapes (N, w), (N, h)
+
+    if assign_on_cpu:
+        paddle.set_device('cpu')
+    gx = img_x[:, None, :].expand(
+        [N, paddle.shape(img_y)[1], paddle.shape(img_x)[1]])
+    gy = img_y[:, :, None].expand(
+        [N, paddle.shape(img_y)[1], paddle.shape(img_x)[1]])
+    grid = paddle.stack([gx, gy], axis=3)
+    img_masks = F.grid_sample(masks, grid, align_corners=False)
+    return img_masks[:, 0]
 
 
 def multiclass_nms(bboxs, num_classes, match_threshold=0.6, match_metric='iou'):

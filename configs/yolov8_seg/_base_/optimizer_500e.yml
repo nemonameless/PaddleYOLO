@@ -1,0 +1,20 @@
+epoch: 500
+
+LearningRate:
+  base_lr: 0.01
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 500
+    min_lr_ratio: 0.01
+  - !ExpWarmup
+    epochs: 3
+
+OptimizerBuilder:
+  optimizer:
+    type: Momentum
+    momentum: 0.937
+    use_nesterov: True
+  regularizer:
+    factor: 0.0005
+    type: L2
+  clip_grad_by_value: 10.

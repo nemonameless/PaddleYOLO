@@ -36,6 +36,7 @@ import copy
 import logging
 import cv2
 from PIL import Image, ImageDraw
+from pycocotools import mask
 import pickle
 import threading
 MUTEX = threading.Lock()
@@ -133,7 +134,7 @@ class RandomHSV(BaseOperator):
         self.gains = [hgain, sgain, vgain]
 
     def __call__(self, sample, context=None):
-        im = sample['image']
+        im = sample['image'].astype(np.uint8)
         r = np.random.uniform(-1, 1, 3) * self.gains + 1
         hue, sat, val = cv2.split(cv2.cvtColor(im, cv2.COLOR_BGR2HSV))
 
@@ -173,6 +174,7 @@ class MosaicPerspective(BaseOperator):
                  scale=0.5,
                  shear=0.0,
                  perspective=0.0,
+                 with_mask=False,
                  boxes_normed=True):
         super(MosaicPerspective, self).__init__()
         self.mosaic_prob = mosaic_prob
@@ -191,6 +193,7 @@ class MosaicPerspective(BaseOperator):
         self.shear = shear
         self.perspective = perspective
         self.boxes_normed = boxes_normed
+        self.with_mask = with_mask
 
     def xywhn2xyxy(self, x, w=640, h=640, padw=0, padh=0):
         # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
@@ -258,7 +261,7 @@ class MosaicPerspective(BaseOperator):
         gt_bboxes = np.clip(gt_bboxes, 0, s * 2)
         gt_classes = [x['gt_class'] for x in sample]
         gt_classes = np.concatenate(gt_classes, axis=0)
-        return image, gt_classes, gt_bboxes
+        return image, gt_classes, gt_bboxes, padw, padh
 
     def letterbox_resize(self,
                          img,
@@ -284,7 +287,7 @@ class MosaicPerspective(BaseOperator):
         gt_bboxes[:, 1] = ratio[1] * gt_bboxes[:, 1] + dh
         gt_bboxes[:, 2] = ratio[0] * gt_bboxes[:, 2] + dw
         gt_bboxes[:, 3] = ratio[1] * gt_bboxes[:, 3] + dh
-        return img, gt_bboxes
+        return img, gt_bboxes, ratio, dw, dh
 
     def random_perspective(self,
                            im,
@@ -400,13 +403,19 @@ class MosaicPerspective(BaseOperator):
         boxes[:, [1, 3]] = boxes[:, [1, 3]].clip(0, shape[0])  # y1, y2
         return boxes
 
+    def _resize_poly(self, poly, im_scale_x, im_scale_y, dw, dh):
+        resized_poly = np.array(poly).astype('float32')
+        resized_poly[0::2] = im_scale_x * resized_poly[0::2] + dw
+        resized_poly[1::2] = im_scale_y * resized_poly[1::2] + dh
+        return resized_poly.tolist()
+
     def __call__(self, sample, context=None):
         # current sample and other 3 samples to a new sample
         if not isinstance(sample, Sequence):
             if self.boxes_normed:
                 h, w, c = sample['image'].shape
                 sample['gt_bbox'] = self.xywhn2xyxy(sample['gt_bbox'], w, h)
-            sample['image'], sample['gt_bbox'] = self.letterbox_resize(
+            sample['image'], sample['gt_bbox'], ratio, dw, dh = self.letterbox_resize(
                 sample['image'], sample['gt_bbox'], self.target_size)
             return sample
         # assert len(sample) == 5 or len(
@@ -416,36 +425,71 @@ class MosaicPerspective(BaseOperator):
         if random.random() >= self.mosaic_prob:
             sample0 = sample[0]
             if self.boxes_normed:
-                h, w, c = sample0['image'].shape
-                sample0['gt_bbox'] = self.xywhn2xyxy(sample0['gt_bbox'], w, h)
-            sample0['image'], sample0['gt_bbox'] = self.letterbox_resize(
-                sample0['image'], sample0['gt_bbox'], self.target_size)
+                s0_h, s0_w = sample0['image'].shape[:2]
+                sample0['gt_bbox'] = self.xywhn2xyxy(sample0['gt_bbox'], s0_w, s0_h)
+            sample0['image'], sample0['gt_bbox'], ratio, dw, dh = self.letterbox_resize(
+                    sample0['image'], sample0['gt_bbox'], self.target_size)
+            sample0['im_shape'] = np.array(sample0['image'].shape[:2], dtype=np.float32)
+
+            if self.with_mask and 'gt_poly' in sample0:
+                gt_polys = sample0['gt_poly']
+                resized_polys = []
+                for gt_poly in gt_polys:
+                    resized_polys.append([
+                        self._resize_poly(poly, ratio[0], ratio[1], dw, dh)
+                        for poly in gt_poly
+                    ])
+                sample0['gt_poly'] = resized_polys
             return sample0
+
+        assert self.with_mask == False, 'ins_seg mosaic still under construction, set mosaic_prob = 0. now'
 
         random.shuffle(sample)  # shuffle sample
 
         # 1._mosaic_preprocess
-        mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self._mosaic4_preprocess(
+        mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes, padw, padh = self._mosaic4_preprocess(
             sample[:4])
 
         # 2.random_perspective
-        mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self.random_perspective(
-            mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes, self.degrees,
-            self.translate, self.scale, self.shear, self.perspective,
-            self.mosaic_border)
+        if self.with_mask:
+            # TODO:
+            # mosaic_gt_polys = gt_bboxes add padw padh
+            # def self.random_perspective_mask
+            raise NotImplementedError
+        else:
+            mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes = self.random_perspective(
+                mosaic_img, mosaic_gt_classes, mosaic_gt_bboxes, self.degrees,
+                self.translate, self.scale, self.shear, self.perspective,
+                self.mosaic_border)
 
         # 3.copy_paste
         # 4.mixup
         if len(mosaic_gt_bboxes) and random.random() < self.mixup_prob:
             sample4 = sample[4]
-            img4, gt_bboxes = self.letterbox_resize(
+            if self.boxes_normed:
+                s4_h, s4_w = sample4['image'].shape[:2]
+                sample4['gt_bbox'] = self.xywhn2xyxy(sample4['gt_bbox'], s4_w, s4_h)
+            img4, gt_bboxes, ratio, dw, dh = self.letterbox_resize(
                 sample4['image'], sample4['gt_bbox'], self.target_size)
+            if self.with_mask and 'gt_poly' in sample4:
+                gt_polys = sample4['gt_poly']
+                resized_polys = []
+                for gt_poly in gt_polys:
+                    resized_polys.append([
+                        self._resize_poly(poly, ratio[0], ratio[1], dw, dh)
+                        for poly in gt_poly
+                    ])
+                gt_polys = resized_polys
 
             r = np.random.beta(8.0, 8.0)
             mosaic_img = (mosaic_img * r + img4 * (1 - r))  #.astype(np.uint8)
             mosaic_gt_classes = np.concatenate(
                 (mosaic_gt_classes, sample4['gt_class']), 0)
             mosaic_gt_bboxes = np.concatenate((mosaic_gt_bboxes, gt_bboxes), 0)
+            if self.with_mask:
+                # TODO:
+                # mosaic_gt_polys = np.concatenate((mosaic_gt_polys, gt_polys), 0)
+                raise NotImplementedError
 
         # 5.paste_in
         # 6.clip
@@ -460,6 +504,10 @@ class MosaicPerspective(BaseOperator):
         sample['image'] = mosaic_img.astype(np.uint8)
         sample['gt_bbox'] = mosaic_gt_bboxes
         sample['gt_class'] = mosaic_gt_classes
+        sample['im_shape'] = np.array(
+            sample['image'].shape[:2], dtype=np.float32)
+        # if self.with_mask:
+        #     sample['gt_poly'] = mosaic_gt_polys
 
         if 'difficult' in sample:
             sample.pop('difficult')
@@ -1311,8 +1359,12 @@ class Resize(BaseOperator):
             im_scale = min(target_size_min / im_size_min,
                            target_size_max / im_size_max)
 
-            resize_h = int(im_scale * float(im_shape[0]) + 0.5)
-            resize_w = int(im_scale * float(im_shape[1]) + 0.5)
+            if 0: # TODO: id use for ins segmentation
+                resize_h = int(im_scale * float(im_shape[0]) + 0.5)
+                resize_w = int(im_scale * float(im_shape[1]) + 0.5)
+            else:
+                resize_h = im_scale * float(im_shape[0])
+                resize_w = im_scale * float(im_shape[1])
 
             im_scale_x = im_scale
             im_scale_y = im_scale
@@ -1910,6 +1962,7 @@ class RandomCrop(BaseOperator):
             return crop_segm
 
         def _crop_rle(rle, crop, height, width):
+            import pycocotools.mask as mask_util
             if 'counts' in rle and type(rle['counts']) == list:
                 rle = mask_util.frPyObjects(rle, height, width)
             mask = mask_util.decode(rle)
@@ -1919,7 +1972,7 @@ class RandomCrop(BaseOperator):
 
         crop_segms = []
         for id in valid_ids:
-            segm = segms[id]
+            segm = self.polygon_to_rle(segms[id], height, width)
             if is_poly(segm):
                 import copy
                 import shapely.ops
@@ -1930,8 +1983,38 @@ class RandomCrop(BaseOperator):
             else:
                 # RLE format
                 import pycocotools.mask as mask_util
-                crop_segms.append(_crop_rle(segm, crop, height, width))
+                res = _crop_rle(segm, crop, height, width)
+                crop_segms.append(self.rle_to_polygon(res))
         return crop_segms
+
+    def polygon_to_rle(self, polygons, height, width):
+        # Create an empty mask
+        mask_img = np.zeros((height, width), dtype=np.uint8)
+
+        # Fill the polygon in the mask
+        for polygon in polygons:
+            contour = np.array(polygon).reshape((-1, 1, 2)).astype(int)
+            cv2.drawContours(mask_img, [contour], 0, 255, -1)
+
+        # Convert binary mask to RLE
+        rle = mask.encode(np.asfortranarray(mask_img))
+        return rle
+
+    def rle_to_polygon(self, rle_mask, min_area=5):
+        binary_mask = mask.decode(rle_mask).squeeze()
+        # Find contours in the binary mask
+        contours, _ = cv2.findContours(
+            binary_mask.astype(np.uint8), cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE)
+        polygons = []
+        for contour in contours:
+            # Convert contour to polygon and filter small areas
+            if cv2.contourArea(contour) >= min_area:
+                # Flatten list and add to polygons
+                polygon = contour.flatten().tolist()
+                if len(polygon) > 4:
+                    polygons.append(polygon)
+        return polygons
 
     def set_fake_bboxes(self, sample):
         sample['gt_bbox'] = np.array(
@@ -4312,6 +4395,7 @@ class DecodeNormResize(BaseOperator):
         self.mosaic = mosaic
 
     def bbox_norm(self, sample):
+        # x1y1x2y2 -> norm cxcywh
         assert 'gt_bbox' in sample
         bbox = sample['gt_bbox']
         height, width = sample['image'].shape[:2]
@@ -4379,9 +4463,9 @@ class DecodeNormResize(BaseOperator):
 
 
 @register_op
-class DecodeNormResizeCache(BaseOperator):
-    def __init__(self, cache_root, target_size, to_rgb=False, mosaic=True):
-        super(DecodeNormResizeCache, self).__init__()
+class DecodeNormResizeMask(BaseOperator):
+    def __init__(self, target_size, to_rgb=False, mosaic=True):
+        super(DecodeNormResizeMask, self).__init__()
         if not isinstance(target_size, (Integral, Sequence)):
             raise TypeError(
                 "Type of target_size is invalid. Must be Integer or List or Tuple, now is {}".
@@ -4392,12 +4476,8 @@ class DecodeNormResizeCache(BaseOperator):
         self.to_rgb = to_rgb
         self.mosaic = mosaic
 
-        self.use_cache = False if cache_root is None else True
-        self.cache_root = cache_root
-        if cache_root is not None:
-            _make_dirs(cache_root)
-
     def bbox_norm(self, sample):
+        # x1y1x2y2 -> norm cxcywh
         assert 'gt_bbox' in sample
         bbox = sample['gt_bbox']
         height, width = sample['image'].shape[:2]
@@ -4409,21 +4489,12 @@ class DecodeNormResizeCache(BaseOperator):
         sample['gt_bbox'] = y
         return sample
 
-    def load_resized_img(self, sample, target_size):
-        if self.use_cache and os.path.exists(
-                self.cache_path(self.cache_root, sample['im_file'])):
-            path = self.cache_path(self.cache_root, sample['im_file'])
-            im = self.load(path)
-            # im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
-            sample['image'] = im
-        else:
-            if 'image' not in sample:
-                img_file = sample['im_file']
-                sample['image'] = cv2.imread(img_file)  # BGR
-                sample.pop('im_file')
-            im = sample['image']
-
-        sample = self.bbox_norm(sample)
+    def load_resized(self, sample, target_size):
+        if 'image' not in sample:
+            img_file = sample['im_file']
+            sample['image'] = cv2.imread(img_file)  # BGR
+            sample.pop('im_file')
+        im = sample['image']
 
         if 'keep_ori_im' in sample and sample['keep_ori_im']:
             sample['ori_image'] = im
@@ -4465,34 +4536,72 @@ class DecodeNormResizeCache(BaseOperator):
         sample['image'] = resized_img
         sample['scale_factor'] = np.array(
             [h / im.shape[0], w / im.shape[1]], dtype=np.float32)
+        sample['im_shape'] = np.array([h, w], dtype=np.float32)
+
+        # apply bbox resize
+        if 'gt_bbox' in sample and len(sample['gt_bbox']) > 0:
+            sample['gt_bbox'] = self.apply_bbox(sample['gt_bbox'], im.shape[:2],
+                                                sample['scale_factor'])
+        # apply bbox_norm
+        if 'gt_bbox' in sample and len(sample['gt_bbox']) > 0:
+            sample = self.bbox_norm(sample)
+
+        # apply polygon resize
+        if 'gt_poly' in sample and len(sample['gt_poly']) > 0:
+            sample['gt_poly'] = self.apply_segm(sample['gt_poly'], im.shape[:2],
+                                                sample['scale_factor'])
         return sample
+
+    def apply_bbox(self, bbox, im_size, scale):
+        im_scale_x, im_scale_y = scale
+        resize_w, resize_h = im_size
+        bbox[:, 0::2] *= im_scale_x
+        bbox[:, 1::2] *= im_scale_y
+        bbox[:, 0::2] = np.clip(bbox[:, 0::2], 0, resize_w)
+        bbox[:, 1::2] = np.clip(bbox[:, 1::2], 0, resize_h)
+        return bbox
+
+    def apply_segm(self, segms, im_size, scale):
+        def _resize_poly(poly, im_scale_x, im_scale_y):
+            resized_poly = np.array(poly).astype('float32')
+            resized_poly[0::2] *= im_scale_x
+            resized_poly[1::2] *= im_scale_y
+            return resized_poly.tolist()
+
+        def _resize_rle(rle, im_h, im_w, im_scale_x, im_scale_y):
+            if 'counts' in rle and type(rle['counts']) == list:
+                rle = mask_util.frPyObjects(rle, im_h, im_w)
+
+            mask = mask_util.decode(rle)
+            mask = cv2.resize(
+                mask,
+                None,
+                None,
+                fx=im_scale_x,
+                fy=im_scale_y,
+                interpolation=self.interp)
+            rle = mask_util.encode(np.array(mask, order='F', dtype=np.uint8))
+            return rle
+
+        im_h, im_w = im_size
+        im_scale_x, im_scale_y = scale
+        resized_segms = []
+        for segm in segms:
+            if is_poly(segm):
+                # Polygon format
+                resized_segms.append([
+                    _resize_poly(poly, im_scale_x, im_scale_y) for poly in segm
+                ])
+            else:
+                # RLE format
+                import pycocotools.mask as mask_util
+                resized_segms.append(
+                    _resize_rle(segm, im_h, im_w, im_scale_x, im_scale_y))
+        return resized_segms
 
     def apply(self, sample, context=None):
-        sample = self.load_resized_img(sample, self.target_size)
+        sample = self.load_resized(sample, self.target_size)
         return sample
-
-    @staticmethod
-    def cache_path(dir_oot, im_file):
-        return os.path.join(dir_oot, os.path.basename(im_file) + '.pkl')
-
-    @staticmethod
-    def load(path):
-        with open(path, 'rb') as f:
-            im = pickle.load(f)
-        return im
-
-    @staticmethod
-    def dump(obj, path):
-        MUTEX.acquire()
-        try:
-            with open(path, 'wb') as f:
-                pickle.dump(obj, f)
-
-        except Exception as e:
-            logger.warning('dump {} occurs exception {}'.format(path, str(e)))
-
-        finally:
-            MUTEX.release()
 
 
 @register_op

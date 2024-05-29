@@ -26,12 +26,14 @@ __all__ = ['YOLOv5']
 class YOLOv5(BaseArch):
     __category__ = 'architecture'
     __inject__ = ['post_process']
+    __shared__ = ['with_mask']
 
     def __init__(self,
                  backbone='CSPDarkNet',
                  neck='YOLOCSPPAN',
                  yolo_head='YOLOv5Head',
                  post_process='BBoxPostProcess',
+                 with_mask=False,
                  for_mot=False):
         """
         YOLOv5, YOLOv6(https://arxiv.org/abs/2209.02976) and YOLOv7(https://arxiv.org/abs/2207.02696)
@@ -49,6 +51,7 @@ class YOLOv5(BaseArch):
         self.yolo_head = yolo_head
         self.post_process = post_process
         self.for_mot = for_mot
+        self.with_mask = with_mask
 
     @classmethod
     def from_config(cls, cfg, *args, **kwargs):
@@ -78,18 +81,26 @@ class YOLOv5(BaseArch):
             return yolo_losses
         else:
             yolo_head_outs = self.yolo_head(neck_feats)
-            post_outs = self.yolo_head.post_process(yolo_head_outs,
-                                                    self.inputs['im_shape'],
-                                                    self.inputs['scale_factor'])
+            post_outs = self.yolo_head.post_process(
+                yolo_head_outs,
+                im_shape=self.inputs['im_shape'],
+                scale_factor=self.inputs['scale_factor'],
+                infer_shape=self.inputs['image'].shape[2:])
 
             if not isinstance(post_outs, (tuple, list)):
                 # if set exclude_post_process, concat([pred_bboxes, pred_scores]) not scaled to origin
                 # export onnx as torch yolo models
                 return post_outs
             else:
-                # if set exclude_nms, [pred_bboxes, pred_scores] scaled to origin
-                bbox, bbox_num = post_outs  # default for end-to-end eval/infer
-                return {'bbox': bbox, 'bbox_num': bbox_num}
+                if not self.with_mask:
+                    # if set exclude_nms, [pred_bboxes, pred_scores] scaled to origin
+                    bbox, bbox_num = post_outs  # default for end-to-end eval/infer
+                    output = {'bbox': bbox, 'bbox_num': bbox_num}
+                else:
+                    bbox, bbox_num, mask = post_outs  # default for end-to-end eval/infer
+                    output = {'bbox': bbox, 'bbox_num': bbox_num, 'mask': mask}
+                    # Note: YOLOv5 Ins models don't support exclude_post_process or exclude_nms
+                return output
 
     def get_loss(self):
         return self._forward()

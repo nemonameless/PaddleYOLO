@@ -1,0 +1,37 @@
+architecture: RTMDet
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9998
+ema_decay_type: "exponential"
+act: silu
+find_unused_parameters: True
+with_mask: True
+
+depth_mult: 1.0
+width_mult: 1.0
+
+RTMDet:
+  backbone: CSPNeXt
+  neck: CSPNeXtPAFPN
+  head: RTMDetInsHead
+  with_mask: True
+  post_process: ~
+
+CSPNeXt:
+  arch: "P5"
+  return_idx: [2, 3, 4]
+
+# use default config
+# CSPNeXtPAFPN:
+
+RTMDetInsHead:
+  exp_on_reg: False
+  fpn_strides: [8, 16, 32]
+  grid_cell_offset: 0
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 1000
+    keep_top_k: 100
+    score_threshold: 0.05
+    nms_threshold: 0.6
+    return_index: True

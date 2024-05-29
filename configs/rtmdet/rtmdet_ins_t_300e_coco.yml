@@ -1,0 +1,14 @@
+_BASE_: [
+  '../datasets/coco_instance.yml',
+  '../runtime.yml',
+  './_base_/optimizer_300e.yml',
+  './_base_/rtmdet_ins_cspnext.yml',
+  './_base_/rtmdet_reader.yml',
+]
+depth_mult: 0.167 # 0.33 in yolox-tiny
+width_mult: 0.375
+
+log_iter: 100
+snapshot_epoch: 10
+weights: output/rtmnet_ins_t_300e_coco/model_final
+pretrain_weights: https://bj.bcebos.com/v1/paddledet/models/pretrained/cspnext_t_pretrained.pdparams
