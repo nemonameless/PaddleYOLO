@@ -361,7 +361,7 @@ class YOLOv5Loss(nn.Layer):
             indices.append(
                 (b, a, gj.astype(paddle.int64), gi.astype(paddle.int64)))
             tbox.append(
-                paddle.concat((gxy - gij, gwh), 1).astype(paddle.float32))
+                paddle.concat((gxy - gij.astype(gxy.dtype), gwh), 1).astype(paddle.float32))
             anch.append(anchor[a])
             tcls.append(c)
         return tcls, tbox, indices, anch
