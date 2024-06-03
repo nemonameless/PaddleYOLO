@@ -8,11 +8,9 @@ from paddle.autograd import PyLayer
 class _AllReduce(PyLayer):
     @staticmethod
     def forward(ctx, input):
-        input_list = [paddle.zeros_like(input) for k in range(dist.get_world_size())]
-        # Use allgather instead of allreduce since I don't trust in-place operations ..
-        dist.all_gather(input_list, input)
-        inputs = paddle.stack(input_list, axis=0)
-        return paddle.sum(inputs, axis=0)
+        input_clone = input.clone().detach()
+        dist.all_reduce(input_clone, sync_op=True)
+        return input_clone
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -85,8 +83,8 @@ class NaiveSyncBatchNorm(nn.layer.norm.BatchNorm2D):
 
         if self._stats_mode == "":
             assert B > 0, 'SyncBatchNorm(stats_mode="") does not support zero batch size.'
-            vec = paddle.concat([mean, meansqr], axis=0)
-            vec = differentiable_all_reduce(vec) * (1.0 / dist.get_world_size())
+            vec = paddle.concat([mean, meansqr], axis=0) * (1.0 / dist.get_world_size())
+            vec = differentiable_all_reduce(vec)
             mean, meansqr = paddle.split(vec, [C, C])
             momentum = (1. - self._momentum)
         else:
