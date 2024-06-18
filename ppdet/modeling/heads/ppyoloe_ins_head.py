@@ -516,7 +516,7 @@ class PPYOLOEInsHead(nn.Layer):
         loss = paddle.to_tensor([0.])
 
         # Normalize to 0-1
-        target_bboxes_normalized = target_bboxes / imgsz[[1, 0, 1, 0]]
+        target_bboxes_normalized = target_bboxes / imgsz[[1, 0, 1, 0]].cast(target_bboxes.dtype)
         # [8, 8400, 4]
 
         # Areas of target bboxes
@@ -525,7 +525,7 @@ class PPYOLOEInsHead(nn.Layer):
 
         # Normalize to mask size
         mxyxy = target_bboxes_normalized * paddle.to_tensor(
-            [mask_w, mask_h, mask_w, mask_h])
+            [mask_w, mask_h, mask_w, mask_h], dtype=target_bboxes_normalized.dtype)
 
         for i, single_i in enumerate(
                 zip(fg_mask, pred_masks, proto, mxyxy, marea, masks)):
