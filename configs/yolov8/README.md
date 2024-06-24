@@ -9,7 +9,7 @@
 
 ## 模型库
 
-### 基础模型
+### 基础检测模型
 
 | 网络网络        | 输入尺寸   | 图片数/GPU | 学习率策略 | TRT-FP16-Latency(ms) | mAP<sup>val<br>0.5:0.95 | mAP<sup>val<br>0.5 | Params(M) | FLOPs(G) |    下载链接       | 配置文件 |
 | :------------- | :------- | :-------: | :------: | :------------: | :---------------------: | :----------------: |:---------: | :------: |:---------------: |:-----: |
@@ -18,6 +18,26 @@
 | *YOLOv8-m        |  640     |    16      |   500e   |    6.5   |  50.2  | 67.3 |  25.90  | 78.9 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_m_500e_coco.pdparams) | [配置文件](./yolov8_m_500e_coco.yml) |
 | *YOLOv8-l        |  640     |    16      |   500e   |    10.0  |  52.8  | 69.6 |  43.69  | 165.2 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_l_500e_coco.pdparams) | [配置文件](./yolov8_l_500e_coco.yml) |
 | *YOLOv8-x        |  640     |    16      |   500e   |    15.1  |  53.8  | 70.6 |  68.23  | 257.8 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_x_500e_coco.pdparams) | [配置文件](./yolov8_x_500e_coco.yml) |
+
+### Open Images v7 大规模600类检测模型
+
+| 网络网络        | 输入尺寸   | 图片数/GPU | 学习率策略 | TRT-FP16-Latency(ms) | mAP<sup>val<br>0.5:0.95 | mAP<sup>val<br>0.5 | Params(M) | FLOPs(G) |    下载链接       | 配置文件 |
+| :------------- | :------- | :-------: | :------: | :------------: | :---------------------: | :----------------: |:---------: | :------: |:---------------: |:-----: |
+| *YOLOv8-n        |  640     |    16      |   100e   |    1.8   |  -  | - |  3.16   | 8.7 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_n_100e_oiv7.pdparams) | [配置文件](openimagev7/yolov8_n_100e_oiv7.yml) |
+| *YOLOv8-s        |  640     |    16      |   100e   |    3.4   |  -  | - |  11.17  | 28.6 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_s_100e_oiv7.pdparams) | [配置文件](openimagev7/yolov8_s_100e_oiv7.yml) |
+| *YOLOv8-m        |  640     |    16      |   100e   |    6.5   |  -  | - |  25.90  | 78.9 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_m_100e_oiv7.pdparams) | [配置文件](openimagev7/yolov8_m_100e_oiv7.yml) |
+| *YOLOv8-l        |  640     |    16      |   100e   |    10.0  |  -  | - |  43.69  | 165.2 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_l_100e_oiv7.pdparams) | [配置文件](openimagev7/yolov8_l_100e_oiv7.yml) |
+| *YOLOv8-x        |  640     |    16      |   100e   |    15.1  |  -  | - |  68.23  | 257.8 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_x_100e_oiv7.pdparams) | [配置文件](openimagev7/yolov8_x_100e_oiv7.yml) |
+
+### 实例分割模型
+
+| 网络网络        | 输入尺寸   | 图片数/GPU | 学习率策略 | TRT-FP16-Latency(ms) | box AP | mask AP | Params(M) | FLOPs(G) |    下载链接       | 配置文件 |
+| :------------- | :------- | :-------: | :------: | :------------: | :---------------------: | :----------------: |:---------: | :------: |:---------------: |:-----: |
+| *YOLOv8-n        |  640     |    16      |   500e   |    -   |  36.6  | - |  3.4   | 12.6 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_seg_n_500e_coco.pdparams) | [配置文件](../yolov8_seg/yolov8_seg_n_500e_coco.yml) |
+| *YOLOv8-s        |  640     |    16      |   500e   |    -   |  44.6  | - |  11.8  | 42.6 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_seg_s_500e_coco.pdparams) | [配置文件](../yolov8_seg/yolov8_seg_s_500e_coco.yml) |
+| *YOLOv8-m        |  640     |    16      |   500e   |    -   |  49.7  | - |  27.3  | 110.2 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_seg_m_500e_coco.pdparams) | [配置文件](../yolov8_seg/yolov8_seg_m_500e_coco.yml) |
+| *YOLOv8-l        |  640     |    16      |   500e   |    -   |  52.1  | - |  46.0  | 220.5 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_seg_l_500e_coco.pdparams) | [配置文件](../yolov8_seg/yolov8_seg_l_500e_coco.yml) |
+| *YOLOv8-x        |  640     |    16      |   500e   |    -   |  53.4  | - |  71.8  | 344.1 | [下载链接](https://paddledet.bj.bcebos.com/models/yolov8_seg_x_500e_coco.pdparams) | [配置文件](../yolov8_seg/yolov8_seg_x_500e_coco.yml) |
 
 ### P6大尺度模型
 

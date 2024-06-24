@@ -1,0 +1,23 @@
+_BASE_: [
+  '../../datasets/openimagesv7_detection.yml',
+  '../../runtime.yml',
+  '../_base_/optimizer_100e.yml',
+  '../_base_/yolov8_cspdarknet.yml',
+  '../_base_/yolov8_reader_high_aug.yml',
+]
+depth_mult: 1.0 # not 1.33 as in YOLOv5
+width_mult: 1.25
+
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov8_x_100e_oiv7/model_final
+
+
+YOLOv8CSPDarkNet:
+  last_stage_ch: 512 # The actual channel is int(512 * width_mult), not int(1024 * width_mult) as in YOLOv5
+
+YOLOv8Head:
+  customized_c3: 320
+
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128

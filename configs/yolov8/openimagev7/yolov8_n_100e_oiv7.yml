@@ -1,0 +1,21 @@
+_BASE_: [
+  '../../datasets/openimagesv7_detection.yml',
+  '../../runtime.yml',
+  '../_base_/optimizer_100e.yml',
+  '../_base_/yolov8_cspdarknet.yml',
+  '../_base_/yolov8_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.25
+
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov8_n_100e_oiv7/model_final
+
+
+YOLOv8Head:
+  customized_c3: 100
+
+
+TrainReader:
+  batch_size: 16 # default 8 gpus, total bs = 128
