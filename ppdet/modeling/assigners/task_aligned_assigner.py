@@ -21,7 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ppdet.core.workspace import register
-from ..bbox_utils import batch_iou_similarity
+from ..bbox_utils import batch_iou_similarity, bbox_iou
 from .utils import (gather_topk_anchors, check_points_inside_bboxes,
                     compute_max_iou_anchor)
 
@@ -61,13 +61,15 @@ class TaskAlignedAssigner(nn.Layer):
                  topk=13,
                  alpha=1.0,
                  beta=6.0,
-                 eps=1e-9,
+                 eps=1e-7,
+                 use_ciou=False,
                  is_close_gt=False):
         super(TaskAlignedAssigner, self).__init__()
         self.topk = topk
         self.alpha = alpha
         self.beta = beta
         self.eps = eps
+        self.use_ciou = use_ciou
         self.is_close_gt = is_close_gt
 
     @paddle.no_grad()
@@ -124,7 +126,12 @@ class TaskAlignedAssigner(nn.Layer):
             return assigned_labels, assigned_bboxes, assigned_scores
 
         # compute iou between gt and pred bbox, [B, n, L]
-        ious = batch_iou_similarity(gt_bboxes, pred_bboxes)
+        # [B, 43, 4] [B, 8400, 4] -> [B, 43, 8400]
+        if self.use_ciou:
+            ious = bbox_iou(gt_bboxes.unsqueeze(2).split(4, axis=-1), pred_bboxes.unsqueeze(1).split(4, axis=-1), x1y1x2y2=True, ciou=True, eps=self.eps).squeeze(-1)
+        else:
+            ious = batch_iou_similarity(gt_bboxes, pred_bboxes, eps=self.eps)
+
         # gather pred bboxes class score
         pred_scores = pred_scores.transpose([0, 2, 1])
         batch_ind = paddle.arange(
