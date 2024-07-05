@@ -613,8 +613,11 @@ class PPYOLOEInsHead(nn.Layer):
                         custom_ceil(mask_logits.shape[-1] / scale_factor[0][1])
                     ],
                     mode='bilinear',
-                    align_corners=False)[..., :round(ori_h.item()), :round(ori_w.item())] # due to npu numeric error, we need to take round of img size.
-                    # align_corners=False)[..., :int(ori_h), :int(ori_w)] # TODO: only for export
+                    align_corners=False)
+                if self.in_export_mode:
+                    mask_logits = mask_logits[..., :int(ori_h), :int(ori_w)]
+                else:
+                    mask_logits = mask_logits[..., :round(ori_h.item()), :round(ori_w.item())] # due to npu numeric error, we need to take round of img size.
             masks = mask_logits.squeeze(0)
             mask_pred = masks > self.mask_thr_binary
 
