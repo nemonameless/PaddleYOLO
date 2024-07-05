@@ -1183,6 +1183,10 @@ class Trainer(object):
         if hasattr(self.cfg, 'export') and 'fuse_conv_bn' in self.cfg[
                 'export'] and self.cfg['export']['fuse_conv_bn']:
             self.model = fuse_conv_bn(self.model)
+        
+        # enable export_mode
+        for layer in self.model.sublayers(include_self=True):
+                layer.in_export_mode = True
 
         model_name = os.path.splitext(os.path.split(self.cfg.filename)[-1])[0]
         save_dir = os.path.join(output_dir, model_name)
