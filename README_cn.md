@@ -122,6 +122,7 @@ paddle2onnx --model_dir output_inference/${job_name} --model_filename model.pdmo
 
 ## 更新日志
 
+* 【2024/07/10】新增昇腾910B硬件支持，支持的模型见 [模型列表](docs/hardware/supported_models.md)
 * 【2023/05/21】支持[RT-DETR](configs/rtdetr)、[YOLOv8](configs/yolov8)、[YOLOv5u](configs/yolov5/yolov5u)和[YOLOv7u](configs/yolov7/yolov7u)训练全流程，支持[YOLOv6Lite](configs/yolov6/yolov6lite)预测和部署；
 * 【2023/03/13】支持[YOLOv5u](configs/yolov5/yolov5u)和[YOLOv7u](configs/yolov7/yolov7u)预测和部署；
 * 【2023/01/10】支持[YOLOv8](configs/yolov8)预测和部署；
