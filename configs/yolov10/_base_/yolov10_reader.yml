@@ -26,7 +26,7 @@ EvalReader:
   sample_transforms:
     - Decode: {}
     - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
-    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
+    - Pad: {size: [672, 672], pad_mode: 1, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
   batch_size: 8
@@ -38,7 +38,7 @@ TestReader:
   sample_transforms:
     - Decode: {}
     - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
-    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
+    - Pad: {size: *input_size, pad_mode: 1, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
   batch_size: 1
