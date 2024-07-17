@@ -10,7 +10,7 @@ width_mult: 0.50
 
 log_iter: 50
 snapshot_epoch: 10
-weights: output/yolov10_n_500e_coco/model_final
+weights: output/yolov10_s_500e_coco/model_final
 
 YOLOv10CSPDarkNet:
   last_stage_ch: 1024
@@ -21,6 +21,3 @@ YOLOv10CSPPAN:
   fpn_use_c2fcib: [false, false]
   pan_use_c2fcib: [false, true]
   use_large_kernel: true
-
-TrainReader:
-  batch_size: 16 # default 8 gpus, total bs = 128

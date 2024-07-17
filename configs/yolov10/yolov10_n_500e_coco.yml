@@ -21,6 +21,3 @@ YOLOv10CSPPAN:
   fpn_use_c2fcib: [false, false]
   pan_use_c2fcib: [false, true]
   use_large_kernel: true
-
-TrainReader:
-  batch_size: 16 # default 8 gpus, total bs = 128
