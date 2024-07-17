@@ -21,7 +21,7 @@
 
 **注意:**
 
-- YOLOv10模型mAP为部署权重在COCO val2017上的`mAP(IoU=0.5:0.95)`结果，且评估使用`multi_label`等trick；
+- YOLOv10模型mAP为部署权重在COCO val2017上的`mAP(IoU=0.5:0.95)`结果，且评估使用`letter_box`,`multi_label`等trick；
 - YOLOv10模型训练使用COCO train2017作为训练集，Box AP为在COCO val2017上的`mAP(IoU=0.5:0.95)`结果；
 - YOLOv10模型训练过程中默认使用8 GPUs进行混合精度训练，默认lr为0.01为8卡总batch_size的设置，如果**GPU卡数**或者每卡**batch
   size**发生改动，也不需要改动学习率，但为了保证高精度最好使用**总batch size大于64**的配置去训练；
