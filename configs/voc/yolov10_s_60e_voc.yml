@@ -1,0 +1,26 @@
+_BASE_: [
+  '../yolov10/yolov10_s_500e_coco.yml'
+  '../datasets/voc.yml',
+]
+log_iter: 50
+snapshot_epoch: 5
+weights: output/yolov10_s_60e_voc/model_final
+
+pretrain_weights: https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_s_500e_coco.pdparams
+
+TrainReader:
+  batch_size: 32 # default 8 gpus, total bs = 256
+
+EvalReader:
+  batch_size: 32
+
+epoch: 60
+LearningRate:
+  base_lr: 0.001
+  schedulers:
+  - !YOLOv5LRDecay
+    max_epochs: 60
+    min_lr_ratio: 0.01
+  - !LinearWarmup
+    start_factor: 0.
+    epochs: 1
