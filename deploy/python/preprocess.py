@@ -250,17 +250,18 @@ class LetterBoxResize(object):
 
 
 class Pad(object):
-    def __init__(self, size, fill_value=[114.0, 114.0, 114.0]):
+    def __init__(self, size, pad_mode=0, fill_value=[114.0, 114.0, 114.0]):
         """
-        Pad image to a specified size.
-        Args:
-            size (list[int]): image target size
-            fill_value (list[float]): rgb value of pad area, default (114.0, 114.0, 114.0)
+        Pad image to a specified size. Args: size (list[int]): image target size pad_mode (int): pad mode,
+        currently only supports four modes [0, 1]. if 1, pad according to center. if 2, only pad left and top
+        fill_value (list[float]): rgb value of pad area, default (114.0, 114.0, 114.0)
         """
         super(Pad, self).__init__()
         if isinstance(size, int):
             size = [size, size]
         self.size = size
+        assert pad_mode in [1, 2], NotImplementedError
+        self.pad_mode = pad_mode
         self.fill_value = fill_value
 
     def __call__(self, im, im_info):
@@ -272,7 +273,13 @@ class Pad(object):
 
         canvas = np.ones((h, w, 3), dtype=np.float32)
         canvas *= np.array(self.fill_value, dtype=np.float32)
-        canvas[0:im_h, 0:im_w, :] = im.astype(np.float32)
+
+        if self.pad_mode == 0:
+            offset_x, offset_y = 0, 0
+        else:
+            offset_y, offset_x = (h - im_h) // 2, (w - im_w) // 2
+
+        canvas[offset_y:im_h, offset_x:im_w, :] = im.astype(np.float32)
         im = canvas
         return im, im_info
 

@@ -6,7 +6,7 @@ LearningRate:
   - !YOLOv5LRDecay
     max_epochs: 500
     min_lr_ratio: 0.01
-  - !ExpWarmup
+  - !LinearWarmup
     epochs: 3
 
 OptimizerBuilder:
