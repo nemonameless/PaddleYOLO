@@ -112,12 +112,12 @@ class YOLOv10Head(nn.Layer):
                               bias_attr=ParamAttr(regularizer=L2Decay(0.0)))
                 ]))
 
+        self.o2o_conv_reg = copy.deepcopy(self.o2m_conv_reg)
+        self.o2o_conv_cls = copy.deepcopy(self.o2m_conv_cls)
+
         self.proj = paddle.arange(self.reg_max).astype('float32')
 
         self._initialize_biases()
-
-        self.o2o_conv_reg = copy.deepcopy(self.o2m_conv_reg)
-        self.o2o_conv_cls = copy.deepcopy(self.o2m_conv_cls)
 
     @classmethod
     def from_config(cls, cfg, input_shape):
@@ -126,13 +126,14 @@ class YOLOv10Head(nn.Layer):
         }
 
     def _initialize_biases(self):
-        for a, b, s in zip(self.o2m_conv_reg, self.o2m_conv_cls,
-                           self.fpn_strides):
-            constant_(a[-1].weight)
-            constant_(a[-1].bias, 1.0)
-            constant_(b[-1].weight)
-            constant_(b[-1].bias,
-                      math.log(5 / self.num_classes / (640 / s)**2))
+        for conv_reg, conv_cls in zip([self.o2m_conv_reg, self.o2o_conv_reg],
+                                      [self.o2m_conv_cls, self.o2o_conv_cls]):
+            for a, b, s in zip(conv_reg, conv_cls, self.fpn_strides):
+                constant_(a[-1].weight)
+                constant_(a[-1].bias, 1.0)
+                constant_(b[-1].weight)
+                constant_(b[-1].bias,
+                          math.log(5 / self.num_classes / (640 / s) ** 2))
 
     def forward(self, feats, targets=None):
         if self.training:
@@ -148,8 +149,8 @@ class YOLOv10Head(nn.Layer):
 
         loss_dict = {}
         for branch_type, conv_reg, conv_cls in zip(
-            ['o2m', 'o2o'], [self.o2m_conv_reg, self.o2o_conv_reg],
-            [self.o2m_conv_cls, self.o2o_conv_cls]):
+                ['o2m', 'o2o'], [self.o2m_conv_reg, self.o2o_conv_reg],
+                [self.o2m_conv_cls, self.o2o_conv_cls]):
             cls_logits_list, bbox_preds_list, bbox_dist_preds_list = [], [], []
             for i, feat in enumerate(feats):
                 if branch_type == 'o2o':
@@ -426,7 +427,7 @@ class YOLOv10Head(nn.Layer):
                 pred_labels.unsqueeze(-1).astype('float32'),
                 pred_scores.unsqueeze(-1), pred_bboxes
             ],
-                                      axis=-1)
+                axis=-1)
             bbox_pred = bbox_pred.reshape([-1, 6])
             bbox_num = paddle.ones([batch_num],
                                    dtype='int32') * self.topk_bbox_num
