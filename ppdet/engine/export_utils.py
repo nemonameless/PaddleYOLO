@@ -172,7 +172,7 @@ def _dump_infer_config(config, path, image_shape, model):
         infer_arch = 'PPYOLOE'
 
     if infer_arch in [
-            'YOLOX', 'YOLOF', 'PPYOLOE', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
+            'YOLOX', 'YOLOF', 'PPYOLOE', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'YOLOv10'
     ]:
         infer_cfg['arch'] = infer_arch
         infer_cfg['min_subgraph_size'] = TRT_MIN_SUBGRAPH[infer_arch]

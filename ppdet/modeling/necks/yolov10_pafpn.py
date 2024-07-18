@@ -130,11 +130,6 @@ class YOLOv10CSPPAN(nn.Layer):
                                    bias=False,
                                    act=act)
 
-        for m in self.sublayers():
-            if isinstance(m, nn.BatchNorm2D):
-                m._momentum = 0.97
-                m._epsilon = 1e-3
-
     def forward(self, feats, for_mot=False):
         [c3, c4, c5] = feats
 

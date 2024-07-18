@@ -119,11 +119,6 @@ class YOLOv10Head(nn.Layer):
         self.o2o_conv_reg = copy.deepcopy(self.o2m_conv_reg)
         self.o2o_conv_cls = copy.deepcopy(self.o2m_conv_cls)
 
-        for m in self.sublayers():
-            if isinstance(m, nn.BatchNorm2D):
-                m._momentum = 0.97
-                m._epsilon = 1e-3
-
     @classmethod
     def from_config(cls, cfg, input_shape):
         return {
@@ -136,59 +131,53 @@ class YOLOv10Head(nn.Layer):
             constant_(a[-1].weight)
             constant_(a[-1].bias, 1.0)
             constant_(b[-1].weight)
-            constant_(b[-1].bias, math.log(5 / self.num_classes / (640 / s)**2))
+            constant_(b[-1].bias,
+                      math.log(5 / self.num_classes / (640 / s)**2))
 
     def forward(self, feats, targets=None):
         if self.training:
-            loss_dict = {}
-            o2m_loss_dict = self.forward_train(feats,
-                                               targets,
-                                               branch_type='o2m')
-            o2o_loss_dict = self.forward_train(feats,
-                                               targets,
-                                               branch_type='o2o')
-            loss_dict.update(o2m_loss_dict)
-            loss_dict.update(o2o_loss_dict)
-            loss_dict.update(
-                {'loss': loss_dict['o2m_loss'] + loss_dict['o2o_loss']})
-            return loss_dict
+            return self.forward_train(feats, targets)
         else:
             return self.forward_eval(feats)
 
-    def forward_train(self, feats, targets, branch_type='o2o'):
+    def forward_train(self, feats, targets):
         anchors, anchor_points, num_anchors_list, stride_tensor = \
             generate_anchors_for_grid_cell(
                 feats, self.fpn_strides, self.grid_cell_scale,
                 self.grid_cell_offset)
 
-        cls_logits_list, bbox_preds_list, bbox_dist_preds_list = [], [], []
-        if branch_type == 'o2o':
-            feats = [feat.detach() for feat in feats]
-            conv_reg = self.o2o_conv_reg
-            conv_cls = self.o2o_conv_cls
-        else:
-            conv_reg = self.o2m_conv_reg
-            conv_cls = self.o2m_conv_cls
-        for i, feat in enumerate(feats):
-            _, _, h, w = feat.shape
-            l = h * w
-            bbox_dist_preds = conv_reg[i](feat)
-            cls_logit = conv_cls[i](feat)
-            bbox_dist_preds = bbox_dist_preds.reshape(
-                [-1, 4, self.reg_max, l]).transpose([0, 3, 1,
-                                                     2])  # [8, 6400, 4, 16]
-            bbox_preds = F.softmax(bbox_dist_preds, axis=3).matmul(
-                self.proj.reshape([-1, 1])).squeeze(-1)  # [8, 6400, 4]
+        loss_dict = {}
+        for branch_type, conv_reg, conv_cls in zip(
+            ['o2m', 'o2o'], [self.o2m_conv_reg, self.o2o_conv_reg],
+            [self.o2m_conv_cls, self.o2o_conv_cls]):
+            cls_logits_list, bbox_preds_list, bbox_dist_preds_list = [], [], []
+            for i, feat in enumerate(feats):
+                if branch_type == 'o2o':
+                    feat = feat.detach()
+                _, _, h, w = feat.shape
+                l = h * w
+                bbox_dist_preds = conv_reg[i](feat)
+                cls_logit = conv_cls[i](feat)
+                bbox_dist_preds = bbox_dist_preds.reshape(
+                    [-1, 4, self.reg_max,
+                     l]).transpose([0, 3, 1, 2])  # [8, 6400, 4, 16]
+                bbox_preds = F.softmax(bbox_dist_preds, axis=3).matmul(
+                    self.proj.reshape([-1, 1])).squeeze(-1)  # [8, 6400, 4]
 
-            cls_logits_list.append(cls_logit)
-            bbox_preds_list.append(
-                bbox_preds.transpose([0, 2, 1]).reshape([-1, 4, h, w]))
-            bbox_dist_preds_list.append(bbox_dist_preds)
+                cls_logits_list.append(cls_logit)
+                bbox_preds_list.append(
+                    bbox_preds.transpose([0, 2, 1]).reshape([-1, 4, h, w]))
+                bbox_dist_preds_list.append(bbox_dist_preds)
 
-        return self.get_loss([
-            cls_logits_list, bbox_preds_list, bbox_dist_preds_list, anchors,
-            anchor_points, num_anchors_list, stride_tensor
-        ], targets, branch_type)
+            loss_dict.update(
+                self.get_loss([
+                    cls_logits_list, bbox_preds_list, bbox_dist_preds_list,
+                    anchors, anchor_points, num_anchors_list, stride_tensor
+                ], targets, branch_type))
+
+        loss_dict.update(
+            {'loss': loss_dict['o2m_loss'] + loss_dict['o2o_loss']})
+        return loss_dict
 
     def forward_eval(self, feats):
         anchor_points, stride_tensor = self._generate_anchors(feats)
@@ -272,7 +261,8 @@ class YOLOv10Head(nn.Layer):
 
         bs = cls_scores[0].shape[0]
         flatten_cls_preds = [
-            cls_pred.transpose([0, 2, 3, 1]).reshape([bs, -1, self.num_classes])
+            cls_pred.transpose([0, 2, 3,
+                                1]).reshape([bs, -1, self.num_classes])
             for cls_pred in cls_scores
         ]
         flatten_pred_bboxes = [
@@ -362,8 +352,8 @@ class YOLOv10Head(nn.Layer):
                                                 assigned_bboxes,
                                                 reg_max=self.reg_max - 1,
                                                 eps=0.01)
-            assigned_ltrb_pos = paddle.masked_select(assigned_ltrb,
-                                                     bbox_mask).reshape([-1, 4])
+            assigned_ltrb_pos = paddle.masked_select(
+                assigned_ltrb, bbox_mask).reshape([-1, 4])
 
             loss_dfl = self._df_loss(pred_dist_pos,
                                      assigned_ltrb_pos) * bbox_weight
@@ -396,11 +386,7 @@ class YOLOv10Head(nn.Layer):
             out_dict.update({f'{tag}_loss_l1': loss_l1 * total_bs})
         return out_dict
 
-    def post_process(self,
-                     head_outs,
-                     im_shape,
-                     scale_factor,
-                     infer_shape):
+    def post_process(self, head_outs, im_shape, scale_factor, infer_shape):
         pred_scores, pred_bboxes, anchor_points, stride_tensor = head_outs
         pred_bboxes = batch_distance2bbox(anchor_points, pred_bboxes)
         pred_bboxes *= stride_tensor
@@ -411,20 +397,25 @@ class YOLOv10Head(nn.Layer):
             # scale bbox to origin
             pad_h = (infer_shape[0] - im_shape[:, 0]) // 2
             pad_w = (infer_shape[1] - im_shape[:, 1]) // 2
-            pad_offset = paddle.stack([pad_w, pad_h, pad_w, pad_h], axis=-1).unsqueeze(1)
+            pad_offset = paddle.stack([pad_w, pad_h, pad_w, pad_h],
+                                      axis=-1).unsqueeze(1)
             pred_bboxes -= pad_offset
             scale_factor = scale_factor.flip(-1).tile([1, 2]).unsqueeze(1)
             pred_bboxes /= scale_factor
 
             batch_num = pred_scores.shape[0]
-            _, index = paddle.topk(pred_scores.max(-1), self.topk_bbox_num, axis=-1)
+            _, index = paddle.topk(pred_scores.max(-1),
+                                   self.topk_bbox_num,
+                                   axis=-1)
             batch_index = paddle.arange(end=batch_num).unsqueeze(-1).tile(
                 [1, self.topk_bbox_num])
             index = paddle.stack([batch_index, index], axis=-1)
             pred_scores = paddle.gather_nd(pred_scores, index)
             pred_bboxes = paddle.gather_nd(pred_bboxes, index)
             # use multi-label trick
-            pred_scores, index = paddle.topk(pred_scores.flatten(1), self.topk_bbox_num, axis=-1)
+            pred_scores, index = paddle.topk(pred_scores.flatten(1),
+                                             self.topk_bbox_num,
+                                             axis=-1)
             pred_labels = index % self.num_classes
             index = index // self.num_classes
             batch_index = paddle.arange(end=batch_num).unsqueeze(-1).tile(
@@ -434,7 +425,9 @@ class YOLOv10Head(nn.Layer):
             bbox_pred = paddle.concat([
                 pred_labels.unsqueeze(-1).astype('float32'),
                 pred_scores.unsqueeze(-1), pred_bboxes
-            ], axis=-1)
+            ],
+                                      axis=-1)
             bbox_pred = bbox_pred.reshape([-1, 6])
-            bbox_num = paddle.ones([batch_num], dtype='int32') * self.topk_bbox_num
+            bbox_num = paddle.ones([batch_num],
+                                   dtype='int32') * self.topk_bbox_num
             return bbox_pred, bbox_num

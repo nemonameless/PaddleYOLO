@@ -472,11 +472,6 @@ class YOLOv10CSPDarkNet(nn.Layer):
         self._out_channels = [_out_channels[i] for i in self.return_idx]
         self.strides = [[2, 4, 8, 16, 32, 64][i] for i in self.return_idx]
 
-        for m in self.sublayers():
-            if isinstance(m, nn.BatchNorm2D):
-                m._momentum = 0.97
-                m._epsilon = 1e-3
-
     def forward(self, inputs):
         x = inputs['image']
         outputs = []
