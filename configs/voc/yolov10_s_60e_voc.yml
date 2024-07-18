@@ -1,5 +1,5 @@
 _BASE_: [
-  '../yolov10/yolov10_s_500e_coco.yml'
+  '../yolov10/yolov10_s_500e_coco.yml',
   '../datasets/voc.yml',
 ]
 log_iter: 50
