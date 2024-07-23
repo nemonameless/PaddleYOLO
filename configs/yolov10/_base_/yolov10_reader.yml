@@ -22,14 +22,25 @@ TrainReader:
   mosaic_epoch: *mosaic_epoch
 
 
+#EvalReader:
+#  sample_transforms:
+#    - Decode: {}
+#    - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
+#    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
+#    - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
+#    - Permute: {}
+#  batch_size: 32
+
+
+# rectangle resize and letterbox resize for high mAP
 EvalReader:
   sample_transforms:
     - Decode: {}
-    - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
-    - Pad: {size: [672, 672], pad_mode: 1, fill_value: [114., 114., 114.]}
+    - YOLOv5KeepRatioResize: {target_size: *input_size, batch_shapes: True, size_divisor: 32, extra_pad_ratio: 0.5}
+    - LetterResize: {scale: *input_size, pad_val: 114, allow_scale_up: False}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
-  batch_size: 32
+  batch_size: 1 # only support bs=1
 
 
 TestReader:
@@ -38,7 +49,7 @@ TestReader:
   sample_transforms:
     - Decode: {}
     - Resize: {target_size: *input_size, keep_ratio: True, interp: 1}
-    - Pad: {size: *input_size, pad_mode: 1, fill_value: [114., 114., 114.]}
+    - Pad: {size: *input_size, fill_value: [114., 114., 114.]}
     - NormalizeImage: {mean: [0., 0., 0.], std: [1., 1., 1.], norm_type: none}
     - Permute: {}
   batch_size: 1

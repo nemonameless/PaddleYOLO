@@ -35,9 +35,13 @@ YOLOv10Head:
     topk: 10
     alpha: 0.5
     beta: 6.0
+    eps: 0.000000001
+    use_ciou: true
   o2o_assigner:
     name: TaskAlignedAssigner
     topk: 1
     alpha: 0.5
     beta: 6.0
+    eps: 0.000000001
+    use_ciou: true
   topk_bbox_num: 300

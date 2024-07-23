@@ -81,7 +81,7 @@ class YOLOv10(BaseArch):
             post_outs = self.yolo_head.post_process(yolo_head_outs,
                                                     self.inputs['im_shape'],
                                                     self.inputs['scale_factor'],
-                                                    self.inputs['image'].shape[-2:])
+                                                    self.inputs.get('pad_param', None))
 
             if not isinstance(post_outs, (tuple, list)):
                 # if set exclude_post_process, concat([pred_bboxes, pred_scores]) not scaled to origin

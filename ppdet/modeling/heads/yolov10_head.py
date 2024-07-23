@@ -387,7 +387,7 @@ class YOLOv10Head(nn.Layer):
             out_dict.update({f'{tag}_loss_l1': loss_l1 * total_bs})
         return out_dict
 
-    def post_process(self, head_outs, im_shape, scale_factor, infer_shape):
+    def post_process(self, head_outs, im_shape, scale_factor, pad_param=None):
         pred_scores, pred_bboxes, anchor_points, stride_tensor = head_outs
         pred_bboxes = batch_distance2bbox(anchor_points, pred_bboxes)
         pred_bboxes *= stride_tensor
@@ -395,12 +395,14 @@ class YOLOv10Head(nn.Layer):
         if self.exclude_post_process:
             return paddle.concat([pred_bboxes, pred_scores], axis=-1), None
         else:
+            if pad_param is not None:
+                pad_h = pad_param[:, 0]
+                pad_w = pad_param[:, 2]
+                pad_offset = paddle.stack([pad_w, pad_h, pad_w, pad_h],
+                                          axis=-1).unsqueeze(1)
+                pred_bboxes -= pad_offset
+
             # scale bbox to origin
-            pad_h = (infer_shape[0] - im_shape[:, 0]) // 2
-            pad_w = (infer_shape[1] - im_shape[:, 1]) // 2
-            pad_offset = paddle.stack([pad_w, pad_h, pad_w, pad_h],
-                                      axis=-1).unsqueeze(1)
-            pred_bboxes -= pad_offset
             scale_factor = scale_factor.flip(-1).tile([1, 2]).unsqueeze(1)
             pred_bboxes /= scale_factor
 

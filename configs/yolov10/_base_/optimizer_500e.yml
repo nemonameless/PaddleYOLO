@@ -18,4 +18,4 @@ OptimizerBuilder:
   regularizer:
     factor: 0.0005
     type: L2
-  clip_grad_by_value: 10.
+  clip_grad_by_norm: 10.
