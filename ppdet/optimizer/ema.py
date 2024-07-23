@@ -71,7 +71,7 @@ class ModelEMA(object):
             if k in self.ema_black_list:
                 self.state_dict[k] = v
             else:
-                self.state_dict[k] = paddle.zeros_like(v, dtype='float32')
+                self.state_dict[k] = paddle.zeros_like(v) #, dtype='float32')
 
         self._model_state = {
             k: weakref.ref(p)
@@ -114,7 +114,7 @@ class ModelEMA(object):
 
         for k, v in self.state_dict.items():
             if k not in self.ema_black_list:
-                v = decay * v + (1 - decay) * model_dict[k].astype('float32')
+                v = decay * v + (1 - decay) * model_dict[k] #.astype('float32')
                 v.stop_gradient = True
                 self.state_dict[k] = v
         self.step += 1
