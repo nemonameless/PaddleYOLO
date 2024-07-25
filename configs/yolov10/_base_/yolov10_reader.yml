@@ -22,6 +22,7 @@ TrainReader:
   mosaic_epoch: *mosaic_epoch
 
 
+# 1. common setting for high speed
 #EvalReader:
 #  sample_transforms:
 #    - Decode: {}
@@ -32,7 +33,7 @@ TrainReader:
 #  batch_size: 32
 
 
-# rectangle resize and letterbox resize for high mAP
+# 2. rectangle resize and letterbox resize for high mAP
 EvalReader:
   sample_transforms:
     - Decode: {}

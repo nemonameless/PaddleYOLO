@@ -10,25 +10,24 @@
 
 ### 基础检测模型
 
-| 网络网络       | 输入尺寸 | 图片数/GPU | 学习率策略 | TRT-FP16-Latency(ms) | mAP<sup>val<br>0.5:0.95 | mAP<sup>val<br>0.5 | Params(M) | FLOPs(G) |                                                   下载链接                                                   |               配置文件                |
-|:-----------|:----:|:-------:|:-----:|:--------------------:|:-----------------------:|:------------------:|:---------:|:--------:|:--------------------------------------------------------------------------------------------------------:|:---------------------------------:|
-| *YOLOv10-n | 640  |   16    | 500e  |         1.8          |          38.6           |        53.9        |    2.3    |   6.7    | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_n_500e_coco.pdparams) | [配置文件](./yolov10_n_500e_coco.yml) |
-| *YOLOv10-s | 640  |   16    | 500e  |         3.4          |          46.2           |        63.0        |    7.2    |   21.6   | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_s_500e_coco.pdparams) | [配置文件](./yolov10_s_500e_coco.yml) |
-| *YOLOv10-m | 640  |   16    | 500e  |         6.5          |          51.1           |        68.2        |   15.4    |   59.1   | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_m_500e_coco.pdparams) | [配置文件](./yolov10_m_500e_coco.yml) |
-| *YOLOv10-b | 640  |   16    | 500e  |         6.5          |          52.5           |        69.6        |   19.1    |   92.0   | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_b_500e_coco.pdparams) | [配置文件](./yolov10_b_500e_coco.yml) |
-| *YOLOv10-l | 640  |   16    | 500e  |         10.0         |          53.2           |        70.2        |   24.4    |  120.3   | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_l_500e_coco.pdparams) | [配置文件](./yolov10_l_500e_coco.yml) |
-| *YOLOv10-x | 640  |   16    | 500e  |         15.1         |          54.4           |        71.3        |   29.5    |  160.4   | [下载链接](https://github.com/MINGtoMING/yolov10_tmp/releases/download/YOLOv10/yolov10_x_500e_coco.pdparams) | [配置文件](./yolov10_x_500e_coco.yml) |
+| 网络网络       | 输入尺寸 | 图片数/GPU | 学习率策略 | TRT-FP16-Latency(ms) | mAP<sup>val<br>0.5:0.95 | mAP<sup>val<br>0.5 | Params(M) | FLOPs(G) |                                      下载链接                                      |               配置文件                |
+|:-----------|:----:|:-------:|:-----:|:--------------------:|:-----------------------:|:------------------:|:---------:|:--------:|:------------------------------------------------------------------------------:|:---------------------------------:|
+| *YOLOv10-n | 640  |   32    | 500e  |          -           |          38.5           |        53.9        |    2.3    |   6.7    | [下载链接](https://bj.bcebos.com/v1/paddledet/models/yolov10_n_500e_coco.pdparams) | [配置文件](./yolov10_n_500e_coco.yml) |
+| *YOLOv10-s | 640  |   32    | 500e  |          -           |          46.3           |        63.0        |    7.2    |   21.6   | [下载链接](https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams) | [配置文件](./yolov10_s_500e_coco.yml) |
+| *YOLOv10-m | 640  |   32    | 500e  |          -           |          51.1           |        68.2        |   15.4    |   59.1   | [下载链接](https://bj.bcebos.com/v1/paddledet/models/yolov10_m_500e_coco.pdparams) | [配置文件](./yolov10_m_500e_coco.yml) |
+| *YOLOv10-b | 640  |   32    | 500e  |          -           |          52.5           |        69.6        |   19.1    |   92.0   | [下载链接](https://bj.bcebos.com/v1/paddledet/models/yolov10_b_500e_coco.pdparams) | [配置文件](./yolov10_b_500e_coco.yml) |
+| *YOLOv10-x | 640  |   32    | 500e  |          -           |          54.4           |        71.3        |   29.5    |  160.4   | [下载链接](https://bj.bcebos.com/v1/paddledet/models/yolov10_x_500e_coco.pdparams) | [配置文件](./yolov10_x_500e_coco.yml) |
 
 **注意:**
 
-- YOLOv10模型mAP为部署权重在COCO val2017上的`mAP(IoU=0.5:0.95)`结果，且评估使用`letter_box`,`multi_label`等trick；
+- YOLOv10模型mAP为部署权重在COCO val2017上的`mAP(IoU=0.5:0.95)`结果；
 - YOLOv10模型训练使用COCO train2017作为训练集，Box AP为在COCO val2017上的`mAP(IoU=0.5:0.95)`结果；
 - YOLOv10模型训练过程中默认使用8 GPUs进行混合精度训练，默认lr为0.01为8卡总batch_size的设置，如果**GPU卡数**或者每卡**batch
   size**发生改动，也不需要改动学习率，但为了保证高精度最好使用**总batch size大于64**的配置去训练；
-- TRT-FP16-Latency(ms)模型推理耗时为TensorRT-FP16下测试的耗时，不包含数据预处理的耗时。测试采用*
-  *单卡Tesla T4 GPU**，batch size=1，测试环境为**paddlepaddle-2.3.2**, **CUDA 11.2**, **CUDNN 8.2**, **GCC-8.2**, *
-  *TensorRT 8.0.3.4**。
 - 如果你设置了`--run_benchmark=True`, 你首先需要安装以下依赖`pip install pynvml psutil GPUtil`。
+- 默认在后处理部分开启`multi_label`，可以通过设置`-o multi_label=False`关闭
+- 默认在验证集上的数据预处理部分使用`YOLOv5KeepRatioResize`和`LetterResize`来取得更高的mAP,
+  详见[yolov10预处理配置文件](./_base_/yolov10_reader.yml)。
 
 ## 使用教程
 
@@ -73,8 +72,8 @@ CUDA_VISIBLE_DEVICES=0 python deploy/python/infer.py --model_dir=output_inferenc
 paddle2onnx --model_dir output_inference/${job_name} --model_filename model.pdmodel --params_filename model.pdiparams --opset_version 12 --save_file ${job_name}.onnx
 
 # 8.onnx trt测速
-/usr/local/TensorRT-8.0.3.4/bin/trtexec --onnx=${job_name}.onnx --workspace=4096 --avgRuns=10 --shapes=input:1x3x640x640 --fp16
-/usr/local/TensorRT-8.0.3.4/bin/trtexec --onnx=${job_name}.onnx --workspace=4096 --avgRuns=10 --shapes=input:1x3x640x640 --fp32
+trtexec --onnx=${job_name}.onnx --workspace=4096 --avgRuns=10 --shapes=input:1x3x640x640 --fp16
+trtexec --onnx=${job_name}.onnx --workspace=4096 --avgRuns=10 --shapes=input:1x3x640x640 --fp32
 ```
 
 ### 1. 训练
@@ -94,7 +93,7 @@ python -m paddle.distributed.launch --gpus 0,1,2,3,4,5,6,7 tools/train.py -c con
 执行以下命令在单个GPU上评估COCO val2017数据集
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python tools/eval.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams
+CUDA_VISIBLE_DEVICES=0 python tools/eval.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams
 ```
 
 ### 3. 推理
@@ -103,10 +102,10 @@ CUDA_VISIBLE_DEVICES=0 python tools/eval.py -c configs/yolov10/yolov10_s_500e_co
 
 ```bash
 # 推理单张图片
-CUDA_VISIBLE_DEVICES=0 python tools/infer.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams --infer_img=demo/000000014439_640x640.jpg
+CUDA_VISIBLE_DEVICES=0 python tools/infer.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams --infer_img=demo/000000014439_640x640.jpg
 
 # 推理文件中的所有图片
-CUDA_VISIBLE_DEVICES=0 python tools/infer.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams --infer_dir=demo
+CUDA_VISIBLE_DEVICES=0 python tools/infer.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams --infer_dir=demo
 ```
 
 ### 4.导出模型
@@ -116,13 +115,13 @@ YOLOv10在GPU上推理部署或benchmark测速等需要通过`tools/export_model
 当你**使用Paddle Inference但不使用TensorRT**时，运行以下的命令导出模型
 
 ```bash
-python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams
+python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams
 ```
 
 当你**使用Paddle Inference且使用TensorRT**时，需要指定`-o trt=True`来导出模型。
 
 ```bash
-python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams trt=True
+python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams trt=True
 ```
 
 如果你想将YOLOv10模型导出为**ONNX格式**，参考
@@ -130,7 +129,7 @@ python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml -o weigh
 
 ```bash
 # 导出推理模型
-python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml --output_dir=output_inference -o weights=https://paddledet.bj.bcebos.com/models/yolov10_s_500e_coco.pdparams
+python tools/export_model.py -c configs/yolov10/yolov10_s_500e_coco.yml --output_dir=output_inference -o weights=https://bj.bcebos.com/v1/paddledet/models/yolov10_s_500e_coco.pdparams
 
 # 安装paddle2onnx
 pip install paddle2onnx

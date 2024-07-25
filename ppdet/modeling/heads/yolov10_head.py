@@ -32,7 +32,7 @@ __all__ = ['YOLOv10Head']
 
 @register
 class YOLOv10Head(nn.Layer):
-    __shared__ = ['num_classes', 'eval_size', 'act', 'exclude_post_process']
+    __shared__ = ['num_classes', 'eval_size', 'act', 'exclude_post_process', 'multi_label']
     __inject__ = ['o2m_assigner', 'o2o_assigner']
 
     def __init__(self,
@@ -54,6 +54,7 @@ class YOLOv10Head(nn.Layer):
                      'dfl': 1.5,
                  },
                  exclude_post_process=False,
+                 multi_label=True,
                  topk_bbox_num=300,
                  print_l1_loss=True):
         super(YOLOv10Head, self).__init__()
@@ -75,6 +76,7 @@ class YOLOv10Head(nn.Layer):
         self.eval_size = eval_size
         self.loss_weight = loss_weight
         self.exclude_post_process = exclude_post_process
+        self.multi_label = multi_label
         self.topk_bbox_num = topk_bbox_num
         self.print_l1_loss = print_l1_loss
 
@@ -407,24 +409,33 @@ class YOLOv10Head(nn.Layer):
             pred_bboxes /= scale_factor
 
             batch_num = pred_scores.shape[0]
-            _, index = paddle.topk(pred_scores.max(-1),
-                                   self.topk_bbox_num,
-                                   axis=-1)
             batch_index = paddle.arange(end=batch_num).unsqueeze(-1).tile(
                 [1, self.topk_bbox_num])
-            index = paddle.stack([batch_index, index], axis=-1)
-            pred_scores = paddle.gather_nd(pred_scores, index)
-            pred_bboxes = paddle.gather_nd(pred_bboxes, index)
+
             # use multi-label trick
-            pred_scores, index = paddle.topk(pred_scores.flatten(1),
-                                             self.topk_bbox_num,
-                                             axis=-1)
-            pred_labels = index % self.num_classes
-            index = index // self.num_classes
-            batch_index = paddle.arange(end=batch_num).unsqueeze(-1).tile(
-                [1, self.topk_bbox_num])
-            index = paddle.stack([batch_index, index], axis=-1)
-            pred_bboxes = paddle.gather_nd(pred_bboxes, index)
+            if self.multi_label:
+                _, index = paddle.topk(pred_scores.max(-1),
+                                       self.topk_bbox_num,
+                                       axis=-1)
+                index = paddle.stack([batch_index, index], axis=-1)
+                pred_scores = paddle.gather_nd(pred_scores, index)
+                pred_bboxes = paddle.gather_nd(pred_bboxes, index)
+                pred_scores, index = paddle.topk(pred_scores.flatten(1),
+                                                 self.topk_bbox_num,
+                                                 axis=-1)
+                pred_labels = index % self.num_classes
+                index = index // self.num_classes
+                index = paddle.stack([batch_index, index], axis=-1)
+                pred_bboxes = paddle.gather_nd(pred_bboxes, index)
+            else:  # common
+                pred_scores, pred_labels = pred_scores.max(-1), pred_scores.argmax(-1)
+                pred_scores, index = paddle.topk(pred_scores,
+                                                 self.topk_bbox_num,
+                                                 axis=-1)
+                index = paddle.stack([batch_index, index], axis=-1)
+                pred_labels = paddle.gather_nd(pred_labels, index)
+                pred_bboxes = paddle.gather_nd(pred_bboxes, index)
+
             bbox_pred = paddle.concat([
                 pred_labels.unsqueeze(-1).astype('float32'),
                 pred_scores.unsqueeze(-1), pred_bboxes
