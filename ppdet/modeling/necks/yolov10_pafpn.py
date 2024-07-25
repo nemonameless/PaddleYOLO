@@ -79,8 +79,7 @@ class YOLOv10CSPPAN(nn.Layer):
                                    depthwise=False,
                                    bias=False,
                                    act=act)
-        #
-        # # bottom-up
+        # bottom-up
         self.down_conv1 = BaseConv(int(in_channels[0]),
                                    int(in_channels[0]),
                                    ksize=3,
@@ -111,7 +110,6 @@ class YOLOv10CSPPAN(nn.Layer):
                                       kernel_size=3,
                                       stride=2,
                                       act=act)
-        #
         if pan_use_c2fcib[1]:
             self.pan_n4 = C2fCIBLayer(int(in_channels[1] + in_channels[2]),
                                       int(in_channels[2]),
