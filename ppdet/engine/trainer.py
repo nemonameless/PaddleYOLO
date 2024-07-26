@@ -206,13 +206,13 @@ class Trainer(object):
             self.model = self.cfg.model
             self.is_loaded_weights = True
 
-        if self.cfg.architecture in ['YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8']:
+        if self.cfg.architecture in ['YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'YOLOv10']:
             reset_initialized_parameter(self.model)
-            if self.model.yolo_head.__class__.__name__ == 'YOLOv5Head':
+            if self.model.yolo_head.__class__.__name__ in ['YOLOv5Head', 'YOLOv10Head']:
                 self.model.yolo_head._initialize_biases()
 
         if cfg.architecture in [
-                'YOLOX', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
+                'YOLOX', 'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'YOLOv10'
         ]:
             for k, m in self.model.named_sublayers():
                 if isinstance(m, nn.BatchNorm2D):
@@ -495,7 +495,7 @@ class Trainer(object):
                 if self.cfg.architecture =='YOLOv5' and self.cfg.use_gpu:
                     data["image"] = data["image"].cuda(blocking=False)
                 if self.cfg.architecture in [
-                        'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8'
+                        'YOLOv5', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'YOLOv10'
                 ]:
                     # TODO: YOLOv5 Warmup, always 3 epoch
                     nw = 3 * len(self.loader)

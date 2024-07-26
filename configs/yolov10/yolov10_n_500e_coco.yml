@@ -1,0 +1,23 @@
+_BASE_: [
+  '../datasets/coco_detection.yml',
+  '../runtime.yml',
+  '_base_/optimizer_500e.yml',
+  '_base_/yolov10_cspdarknet.yml',
+  '_base_/yolov10_reader.yml',
+]
+depth_mult: 0.33
+width_mult: 0.25
+
+log_iter: 50
+snapshot_epoch: 10
+weights: output/yolov10_n_500e_coco/model_final
+
+YOLOv10CSPDarkNet:
+  last_stage_ch: 1024
+  use_c2fcib: false
+  use_large_kernel: false
+
+YOLOv10CSPPAN:
+  fpn_use_c2fcib: [false, false]
+  pan_use_c2fcib: [false, true]
+  use_large_kernel: true

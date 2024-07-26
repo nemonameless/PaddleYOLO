@@ -128,7 +128,7 @@ class TaskAlignedAssigner(nn.Layer):
         # compute iou between gt and pred bbox, [B, n, L]
         # [B, 43, 4] [B, 8400, 4] -> [B, 43, 8400]
         if self.use_ciou:
-            ious = bbox_iou(gt_bboxes.unsqueeze(2).split(4, axis=-1), pred_bboxes.unsqueeze(1).split(4, axis=-1), x1y1x2y2=True, ciou=True, eps=self.eps).squeeze(-1)
+            ious = bbox_iou(gt_bboxes.unsqueeze(2).split(4, axis=-1), pred_bboxes.unsqueeze(1).split(4, axis=-1), x1y1x2y2=True, ciou=True, eps=self.eps).squeeze(-1).clip(0.)
         else:
             ious = batch_iou_similarity(gt_bboxes, pred_bboxes, eps=self.eps)
 

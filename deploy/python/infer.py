@@ -38,7 +38,7 @@ from utils import argsparser, Timer, get_current_memory_mb, multiclass_nms, coco
 
 # Global dictionary
 SUPPORT_MODELS = {
-    'YOLO', 'PPYOLOE', 'YOLOX', 'YOLOF', 'YOLOv5', 'RTMDet', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'DETR'
+    'YOLO', 'PPYOLOE', 'YOLOX', 'YOLOF', 'YOLOv5', 'RTMDet', 'YOLOv6', 'YOLOv7', 'YOLOv8', 'DETR', 'YOLOv10'
 }
 
 

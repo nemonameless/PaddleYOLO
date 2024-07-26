@@ -1,0 +1,47 @@
+architecture: YOLOv10
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9999
+ema_decay_type: "exponential"
+act: silu
+find_unused_parameters: True
+
+depth_mult: 1.0 # default: L version
+width_mult: 1.0
+
+YOLOv8:
+  backbone: YOLOv10CSPDarkNet
+  neck: YOLOv10CSPPAN
+  yolo_head: YOLOv10Head
+  post_process: ~
+
+YOLOv10CSPDarkNet:
+  arch: 'P5'
+  return_idx: [2, 3, 4]
+  last_stage_ch: 512
+  use_c2fcib: True
+  use_large_kernel: False
+
+YOLOv10CSPPAN:
+  fpn_use_c2fcib: [true, false]
+  pan_use_c2fcib: [true, true]
+  use_large_kernel: false
+
+YOLOv10Head:
+  fpn_strides: [8, 16, 32]
+  loss_weight: {class: 0.5, iou: 7.5, dfl: 1.5}
+  o2m_assigner:
+    name: TaskAlignedAssigner
+    topk: 10
+    alpha: 0.5
+    beta: 6.0
+    eps: 0.000000001
+    use_ciou: true
+  o2o_assigner:
+    name: TaskAlignedAssigner
+    topk: 1
+    alpha: 0.5
+    beta: 6.0
+    eps: 0.000000001
+    use_ciou: true
+  topk_bbox_num: 300
